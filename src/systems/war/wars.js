@@ -254,6 +254,13 @@ export function onWarDeclared(state, war, ctx, { claimed = false } = {}) {
   if (war.defenders.includes(player) && war.defenders[0] === player) kind = 'attackOnPlayer';
   else if (war.attackers[0] === player) kind = 'playerDeclared';
   else if (player && hasTreaty(state, player, defender.id, 'alliance') && !sideOf(war, player)) kind = 'allianceCall';
+  // a tension warning about this attacker is overtaken by events
+  const opposed = (a, b) => {
+    const sa = sideOf(war, a);
+    const sb = sideOf(war, b);
+    return !!sa && !!sb && sa !== sb;
+  };
+  state.events.pending = state.events.pending.filter((e) => !(e.eventId === 'warTension' && opposed(e.data?.attacker, e.data?.defender)));
   if (player && kind !== 'playerDeclared') {
     const eventId = { attackOnPlayer: 'warAttackOnPlayer', allianceCall: 'warAllianceCall', warDeclared: 'warCrisis' }[kind];
     fireEvent(state, eventId, player, { otherId: attacker.id, data: { warId: war.id, attacker: attacker.id, defender: defender.id, pauseKind: kind } }, ctx);

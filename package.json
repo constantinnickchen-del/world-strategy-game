@@ -1,6 +1,6 @@
 {
   "name": "world-strategy",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Langfristiges Grand-Strategy-Spiel f\u00fcr den Browser (HTML, CSS, JavaScript).",
   "type": "module",
   "private": true,

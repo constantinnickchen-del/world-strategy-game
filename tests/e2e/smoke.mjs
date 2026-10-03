@@ -109,12 +109,12 @@ try {
   assert(true, 'overview panel opens at game start');
   await page.click('[data-action="closePanel"]');
   await page.waitForSelector('#drawer[hidden]', { state: 'attached' });
-  for (const id of ['overview', 'economy', 'politics', 'diplomacy', 'trade', 'research', 'military', 'world', 'news']) {
+  for (const id of ['overview', 'economy', 'politics', 'diplomacy', 'trade', 'research', 'military', 'wars', 'world', 'news']) {
     await page.click(`.nav-btn[data-panel="${id}"]`);
     await page.waitForSelector(`#drawer[data-panel="${id}"]:not([hidden])`);
     if (id === 'economy' || id === 'research') await shot(`03-${id}`);
   }
-  assert(true, 'all nine panels open');
+  assert(true, 'all ten panels open');
 
   console.log('Commands');
   await page.click('.nav-btn[data-panel="research"]');
@@ -142,7 +142,7 @@ try {
   await shot('04-info');
 
   console.log('Map modes');
-  for (const mode of ['relations', 'treaties', 'gdppc', 'growth', 'stability', 'infrastructure', 'military', 'resources', 'political']) {
+  for (const mode of ['war', 'relations', 'treaties', 'gdppc', 'growth', 'stability', 'infrastructure', 'military', 'resources', 'political']) {
     await page.click(`.mode-btn[data-mode="${mode}"]`);
   }
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -194,6 +194,71 @@ try {
   await page.click('[data-confirm-yes]');
   await page.waitForFunction((d) => window.worldStrategy.session.state.time.day === d, savedDay);
   assert(true, 'loading restores the saved date');
+
+  console.log('Military & war');
+  while (await page.locator('.event-option').count()) await page.locator('.event-option').first().click();
+  await page.click('.nav-btn[data-panel="military"]');
+  for (const tab of ['army', 'air', 'navy', 'production', 'procurement', 'facilities', 'stock', 'overview']) {
+    await page.click(`#drawer .tab-btn[data-tab="${tab}"]`);
+    await page.waitForSelector(`#drawer .tab-btn.is-active[data-tab="${tab}"]`);
+    if (tab === 'overview' || tab === 'army') await shot(`08-military-${tab}`);
+  }
+  assert(true, 'all military tabs render');
+  await page.click('#drawer .tab-btn[data-tab="production"]');
+  await page.selectOption('#drawer select[name="product"]', 'equipment:ammunition');
+  await page.fill('#drawer input[name="quantity"]', '5000');
+  await page.click('#drawer form[data-cmd-form] button[type="submit"]');
+  assert(await page.evaluate(() => window.worldStrategy.session.player.military.production.some((l) => l.item === 'ammunition' && l.quantity === 5000)), 'production order placed through the form');
+  // region panel: raise a formation in Bavaria
+  const units0 = await page.evaluate(() => window.worldStrategy.session.player.military.units.length);
+  await page.evaluate(() => window.worldStrategy.ui.actions.focusRegion({ region: 'DE-BY' }));
+  await page.waitForSelector('#infopanel [data-tut="region"]');
+  await page.selectOption('#infopanel form[data-cmd-form*="raiseUnit"] select[name="unitType"]', 'infantry');
+  await page.click('#infopanel form[data-cmd-form*="raiseUnit"] button[type="submit"]');
+  assert((await page.evaluate(() => window.worldStrategy.session.player.military.units.length)) === units0 + 1, 'a formation is raised from the region panel');
+  // move mode: select a formation, click a destination region
+  const moved = await page.evaluate(() => {
+    const { ui, session } = window.worldStrategy;
+    const u = session.player.military.units.find((x) => x.status === 'active' && x.region !== 'DE-BE');
+    ui.startMove([u.id]);
+    ui.selectRegion('DE-BE');
+    return { target: u.target, mode: ui.moveMode };
+  });
+  assert(moved.target === 'DE-BE' && moved.mode === null, 'move order via map click');
+  // declaring war through the dialog stops the clock immediately
+  await page.evaluate(() => window.worldStrategy.session.setSpeed(2));
+  await page.evaluate(() => window.worldStrategy.ui.declareWar.open('VEN'));
+  await page.waitForSelector('.war-modal [data-declare]');
+  await shot('09-declare-war');
+  await page.click('.war-modal [data-declare]');
+  await page.waitForSelector('#drawer[data-panel="wars"]:not([hidden])');
+  const declared = await page.evaluate(() => ({ speed: window.worldStrategy.session.clock.speed, kind: window.worldStrategy.session.lastInterrupt?.kind, wars: window.worldStrategy.session.state.wars.length }));
+  assert(declared.speed === 0 && declared.kind === 'playerDeclared' && declared.wars >= 1, 'player war declaration pauses and opens the war room');
+  await page.click('.mode-btn[data-mode="war"]');
+  await shot('10-war-room');
+  // an AI war at maximum speed pauses on the day of the outbreak
+  const pause = await page.evaluate(async () => {
+    const { session } = window.worldStrategy;
+    const { executeCommand } = await import('/src/commands/commands.js');
+    const warDay = session.state.time.day + 25;
+    let declaredDay = null;
+    session.bus.on('day', () => {
+      if (declaredDay !== null || session.state.time.day < warDay) return;
+      declaredDay = session.state.time.day;
+      executeCommand(session.state, { type: 'declareWar', countryId: 'PAK', targetId: 'IND', goals: [{ type: 'region', regionId: 'IN-JK' }] }, session.sim.context(session.state));
+    });
+    session.settings.pauseOnEvents = false; // only crises may stop the clock in this check
+    session.setSpeed(4);
+    const t0 = performance.now();
+    while (session.clock.speed !== 0 && performance.now() - t0 < 15000) await new Promise((r) => setTimeout(r, 30));
+    session.settings.pauseOnEvents = true;
+    return { declaredDay, day: session.state.time.day, speed: session.clock.speed, kind: session.lastInterrupt?.kind };
+  });
+  assert(pause.speed === 0 && pause.declaredDay === pause.day && pause.kind === 'warDeclared', `AI war at maximum speed pauses on the same day (${JSON.stringify(pause)})`);
+  await page.waitForSelector('.event-modal.is-crisis');
+  await shot('11-crisis');
+  await page.locator('.event-modal .event-option:not([disabled])').first().click();
+  while (await page.locator('.event-option').count()) await page.locator('.event-option:not([disabled])').first().click();
 
   console.log('Reload persistence');
   await page.reload();

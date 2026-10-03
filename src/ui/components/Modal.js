@@ -69,6 +69,8 @@ export class Toasts {
   }
 
   show(text, { tone = 'info', ms = 3500 } = {}) {
+    // at high speed many reports arrive at once: keep only the newest few on screen
+    while (this.root.children.length >= 4) this.root.firstElementChild.remove();
     const el = document.createElement('div');
     el.className = `toast toast-${tone}`;
     el.setAttribute('role', 'status');

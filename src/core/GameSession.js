@@ -133,6 +133,16 @@ export class GameSession {
     return !!this.state && this.state.events.pending.length > 0;
   }
 
+  /** Pending decisions that hold the clock: all of them, or only crises when event pauses are off. */
+  get hasBlockingPlayerEvent() {
+    if (!this.state) return false;
+    if (this.settings.pauseOnEvents !== false) return this.hasPendingPlayerEvent;
+    return this.state.events.pending.some((e) => {
+      const setting = e.data?.pauseKind ? INTERRUPT_SETTING[e.data.pauseKind] : null;
+      return setting && this.pauseEnabled(setting);
+    });
+  }
+
   setSpeed(speed) {
     if (speed > 0) this.autoPausedSpeed = 0;
     const s = this.clock.setSpeed(speed);
@@ -167,7 +177,7 @@ export class GameSession {
         this.bus.emit('interrupted', info);
         break;
       }
-      if (this.hasPendingPlayerEvent && this.settings.pauseOnEvents !== false) {
+      if (this.hasBlockingPlayerEvent) {
         this.autoPausedSpeed = this.clock.speed;
         this.setSpeed(0);
         break;
@@ -196,7 +206,7 @@ export class GameSession {
       this.bus.emit('interrupted', info);
     }
     // The game paused itself for an event: resume once the last decision is made.
-    if (result.ok && cmd.type === 'resolveEvent' && !this.hasPendingPlayerEvent && this.autoPausedSpeed) {
+    if (result.ok && cmd.type === 'resolveEvent' && !this.hasBlockingPlayerEvent && this.autoPausedSpeed) {
       this.setSpeed(this.autoPausedSpeed);
       this.autoPausedSpeed = 0;
     }

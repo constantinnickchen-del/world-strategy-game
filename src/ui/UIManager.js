@@ -28,6 +28,11 @@ import { DiplomacyPanel } from './panels/DiplomacyPanel.js';
 import { TradePanel } from './panels/TradePanel.js';
 import { ResearchPanel } from './panels/ResearchPanel.js';
 import { MilitaryPanel } from './panels/MilitaryPanel.js';
+import { WarPanel } from './panels/WarPanel.js';
+import { DeclareWarModal } from './modals/DeclareWarModal.js';
+import { STATIC_REGIONS } from '../state/worldIndex.js';
+import { planMove } from '../systems/war/movement.js';
+import { unitLabel } from '../systems/military/units.js';
 import { WorldPanel } from './panels/WorldPanel.js';
 import { NewsPanel } from './panels/NewsPanel.js';
 import { createGameState } from '../state/createGameState.js';
@@ -38,7 +43,7 @@ import { esc, flagEmoji } from '../util/format.js';
 import { DEFAULT_SCENARIO } from '../data/scenarios.js';
 
 const PANELS = Object.fromEntries(
-  [OverviewPanel, EconomyPanel, PoliticsPanel, DiplomacyPanel, TradePanel, ResearchPanel, MilitaryPanel, WorldPanel, NewsPanel].map((p) => [p.id, p]),
+  [OverviewPanel, EconomyPanel, PoliticsPanel, DiplomacyPanel, TradePanel, ResearchPanel, MilitaryPanel, WarPanel, WorldPanel, NewsPanel].map((p) => [p.id, p]),
 );
 
 export class UIManager {
@@ -62,6 +67,15 @@ export class UIManager {
     this.monthsSinceAutosave = 0;
     this.autosaveSlot = 1;
     this.rankCache = null;
+    this.selectedRegion = null;
+    this.moveMode = null; // { unitIds } while the player picks a destination on the map
+    this.moveTargetOk = false;
+    this.militaryTab = 'overview';
+    this.procurementFilter = 'all';
+    this.unitSelection = new Set();
+    this.openWar = null;
+    this.collapsedWars = new Set();
+    this.peaceDraft = null;
   }
 
   init() {
@@ -83,11 +97,12 @@ export class UIManager {
     this.menu = new MenuModal(this);
     this.startScreen = new StartScreen(this.el.startScreen, this);
     this.tutorial = new Tutorial($('tutorial-root'), this);
+    this.declareWar = new DeclareWarModal(this);
     this.map = new MapRenderer($('map'), {
       getState: () => this.session.state,
       getMode: () => this.mapMode,
       getUi: () => this,
-      onSelect: (id) => this.select(id),
+      onSelect: (regionId) => this.selectRegion(regionId),
       onHover: (id, ev) => this.onMapHover(id, ev),
     });
     this.map.showLabels = this.settings.showLabels;
@@ -104,6 +119,8 @@ export class UIManager {
     const preview = createGameState({ scenarioId: DEFAULT_SCENARIO, playerId: null, seed: 'preview' });
     this.session.replaceState(preview);
     this.selected = null;
+    this.selectedRegion = null;
+    this.moveMode = null;
     this.activePanel = null;
     if (MAP_MODE_BY_ID[this.mapMode]?.needsPlayer) this.mapMode = 'political';
     document.body.classList.add('is-setup');
@@ -120,6 +137,12 @@ export class UIManager {
     this.modals.closeAll();
     this.activePanel = 'overview';
     this.selected = this.isNarrow ? null : state.playerId;
+    this.selectedRegion = null;
+    this.moveMode = null;
+    this.unitSelection = new Set();
+    this.openWar = null;
+    this.collapsedWars = new Set();
+    this.peaceDraft = null;
     this.map.setSelected(this.selected);
     this.monthsSinceAutosave = 0;
     this.map.focusCountry(state.playerId);
@@ -138,10 +161,12 @@ export class UIManager {
   }
 
   /** Used by tutorial steps to show a specific panel / country. */
-  setTutorialLayout({ panel = null, select = null }) {
+  setTutorialLayout({ panel = null, select = null, region = null, militaryTab = null }) {
     this.activePanel = panel;
     this.selected = select;
-    this.map.setSelected(select);
+    this.selectedRegion = region;
+    if (militaryTab) this.militaryTab = militaryTab;
+    this.map.setSelected(select, region);
     this.mark('drawer', 'nav', 'info');
   }
 
@@ -248,15 +273,101 @@ export class UIManager {
     return window.matchMedia('(max-width: 1100px)').matches;
   }
 
-  select(id) {
+  select(id, regionId = null) {
     this.selected = id && this.session.state.countries[id] ? id : null;
+    this.selectedRegion = this.selected && regionId ? regionId : null;
     if (this.selected && this.isNarrow && this.mode === 'game' && this.activePanel) {
       this.activePanel = null;
       this.mark('drawer', 'nav');
     }
-    this.map.setSelected(this.selected);
+    this.map.setSelected(this.selected, this.selectedRegion);
     if (this.mode === 'setup') this.mark('start');
     else this.mark('info');
+  }
+
+  /** Map click: select a region (and its owner) – or give a move order in move mode. */
+  selectRegion(regionId) {
+    if (this.moveMode && this.mode === 'game') {
+      if (regionId) this.orderMove(this.moveMode.unitIds, regionId);
+      this.cancelMove();
+      return;
+    }
+    const r = regionId ? this.session.state.regions[regionId] : null;
+    if (this.mode === 'setup') this.select(r?.owner ?? null);
+    else this.select(r?.owner ?? null, regionId);
+  }
+
+  startMove(unitIds) {
+    const ids = unitIds.filter(Boolean);
+    if (!ids.length) return;
+    this.moveMode = { unitIds: ids };
+    document.body.classList.add('is-move-mode');
+    this.toasts.show(`${ids.length} Verband/Verbände ausgewählt – Zielregion auf der Karte anklicken (Esc bricht ab).`, { ms: 4500 });
+    this.map.requestRender();
+  }
+
+  cancelMove() {
+    this.moveMode = null;
+    this.moveTargetOk = false;
+    document.body.classList.remove('is-move-mode');
+    this.tooltip.hide();
+    this.map.requestRender();
+  }
+
+  /** Issues moveUnit for several formations and reports one summary. */
+  orderMove(unitIds, regionId) {
+    let ok = 0;
+    let lastError = '';
+    let lastMsg = '';
+    for (const unitId of unitIds) {
+      const res = this.session.execute({ type: 'moveUnit', unitId, regionId });
+      if (res.ok) {
+        ok++;
+        lastMsg = res.message;
+      } else lastError = res.error;
+    }
+    const name = STATIC_REGIONS[regionId]?.name ?? regionId;
+    if (ok === 1) this.toasts.show(lastMsg, { tone: 'good' });
+    else if (ok > 1) this.toasts.show(`${ok} Verbände erhalten den Befehl: ${name}.`, { tone: 'good' });
+    if (lastError) this.toasts.show(`${unitIds.length - ok} Verband/Verbände konnten nicht: ${lastError}`, { tone: ok ? 'warn' : 'bad', ms: 5000 });
+    this.unitSelection = new Set();
+    this.markAll();
+  }
+
+  openWarsPanel(warId = null) {
+    if (warId) {
+      this.openWar = warId;
+      this.collapsedWars.delete(warId);
+    }
+    this.activePanel = 'wars';
+    this.closeInfoIfNarrow();
+    this.mark('drawer', 'nav');
+  }
+
+  /** Reaction to an automatic pause (war outbreak, attack, crisis …). */
+  onInterrupted(info) {
+    if (this.mode !== 'game') return;
+    const state = this.session.state;
+    const labels = {
+      warDeclared: 'Kriegsausbruch',
+      playerDeclared: 'Kriegserklärung',
+      attackOnPlayer: 'Angriff auf Ihr Land',
+      warJoined: 'Neuer Kriegsgegner',
+      allianceCall: 'Bündnisfall',
+      diplomaticCrisis: 'Diplomatische Krise',
+      peace: 'Friedensschluss',
+      bankruptcy: 'Staatsbankrott',
+      revolution: 'Machtwechsel',
+    };
+    const who = info.countryId ? ` (${state.countries[info.countryId]?.name ?? ''})` : '';
+    this.toasts.show(`⏸ Spiel angehalten: ${labels[info.kind] ?? info.kind}${who}.`, { tone: 'warn', ms: 6000 });
+    const war = info.warId ? state.wars.find((w) => w.id === info.warId) : null;
+    if (war && info.kind !== 'peace') {
+      this.openWarsPanel(war.id);
+      const goal = war.goals.find((g) => g.type === 'region')?.regionId;
+      if (goal) this.map.focusRegion(goal, 9);
+    }
+    this.markAll();
   }
 
   openPanel(id) {
@@ -362,6 +473,12 @@ export class UIManager {
     }
   }
 
+  updatePauseSetting(key, value) {
+    this.settings.pauseOn = { ...(this.settings.pauseOn ?? {}), [key]: value };
+    saveSettings(this.settings);
+    this.session.settings = this.settings;
+  }
+
   updateSetting(key, value) {
     this.settings[key] = value;
     saveSettings(this.settings);
@@ -377,6 +494,38 @@ export class UIManager {
   get actions() {
     return {
       selectCountry: (ds) => this.select(ds.id || null),
+      clearRegion: () => this.select(this.selected),
+      focusRegion: (ds) => {
+        const r = this.session.state.regions[ds.region];
+        if (!r) return;
+        this.select(r.owner, ds.region);
+        this.map.focusRegion(ds.region);
+      },
+      startMove: (ds) => this.startMove(String(ds.units ?? '').split(',')),
+      orderMove: (ds) => this.orderMove(String(ds.units ?? '').split(',').filter(Boolean), ds.region),
+      openDeclareWar: (ds) => this.declareWar.open(ds.target, ds.region || null),
+      setMilitaryTab: (ds) => {
+        this.militaryTab = ds.tab;
+        this.activePanel = 'military';
+        this.mark('drawer', 'nav');
+      },
+      setProcurementFilter: (ds) => {
+        this.procurementFilter = ds.filter;
+        this.mark('drawer');
+      },
+      clearUnitSelection: () => {
+        this.unitSelection = new Set();
+        this.mark('drawer');
+      },
+      toggleWar: (ds) => {
+        const war = this.session.state.wars.find((w) => w.id === ds.war);
+        const own = war && (war.attackers.includes(this.session.state.playerId) || war.defenders.includes(this.session.state.playerId));
+        if (own) {
+          if (this.collapsedWars.has(ds.war)) this.collapsedWars.delete(ds.war);
+          else this.collapsedWars.add(ds.war);
+        } else this.openWar = this.openWar === ds.war ? null : ds.war;
+        this.mark('drawer');
+      },
       focusPlayer: () => {
         this.select(this.session.state.playerId);
         this.map.focusCountry(this.session.state.playerId);
@@ -472,6 +621,21 @@ export class UIManager {
       if (action === 'selectCountry' && t.value) {
         this.select(t.value);
         this.map.focusCountry(t.value);
+      } else if (action === 'toggleUnitSel') {
+        if (t.checked) this.unitSelection.add(t.dataset.unit);
+        else this.unitSelection.delete(t.dataset.unit);
+        this.mark('drawer');
+      } else if (action === 'setAutoFront') {
+        this.execute({ type: 'setAutoFront', active: t.checked });
+      } else if (action === 'togglePeaceRegion' || action === 'setPeaceReparations') {
+        const warId = t.dataset.war;
+        const d = this.peaceDraft?.warId === warId ? this.peaceDraft : { warId, regions: [], reparations: 0 };
+        if (action === 'togglePeaceRegion') d.regions = t.checked ? [...new Set([...d.regions, t.dataset.region])] : d.regions.filter((r) => r !== t.dataset.region);
+        else d.reparations = Math.max(0, Math.round(Number(t.value) || 0));
+        this.peaceDraft = d;
+        this.mark('drawer');
+      } else if (action === 'setPauseSetting') {
+        this.updatePauseSetting(t.dataset.key, t.checked);
       } else if (action === 'setSetting') {
         const key = t.dataset.key;
         this.updateSetting(key, t.type === 'checkbox' ? t.checked : Number(t.value));
@@ -493,6 +657,12 @@ export class UIManager {
     });
 
     document.addEventListener('submit', (ev) => {
+      const cmdForm = ev.target.closest('form[data-cmd-form]');
+      if (cmdForm) {
+        ev.preventDefault();
+        this.execute(formCommand(cmdForm));
+        return;
+      }
       const form = ev.target.closest('form[data-action-submit]');
       if (!form) return;
       ev.preventDefault();
@@ -516,14 +686,16 @@ export class UIManager {
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || ev.ctrlKey || ev.metaKey || ev.altKey) return;
     if (this.modals.isOpen) return; // Escape handled by the modal manager
     if (ev.key === 'Escape') {
-      if (this.activePanel) this.actions.closePanel();
+      if (this.moveMode) this.cancelMove();
+      else if (this.selectedRegion && this.mode === 'game') this.select(this.selected);
+      else if (this.activePanel) this.actions.closePanel();
       else if (this.selected && this.mode === 'game') this.select(null);
       else this.actions.openMenu({});
       ev.preventDefault();
       return;
     }
     if (this.mode !== 'game') return;
-    const speedKeys = { 1: 1, 2: 2, 3: 3 };
+    const speedKeys = { 1: 1, 2: 2, 3: 3, 4: 4 };
     if (ev.key === ' ') {
       ev.preventDefault();
       if (this.session.hasPendingPlayerEvent && this.settings.pauseOnEvents) return;
@@ -540,15 +712,28 @@ export class UIManager {
     }
   }
 
-  onMapHover(id, ev) {
+  onMapHover(regionId, ev) {
     const state = this.session.state;
-    const c = id ? state?.countries[id] : null;
+    const r = regionId ? state?.regions[regionId] : null;
+    const c = r ? state.countries[r.owner] : null;
     if (!c || !ev) {
       if (this.tooltip.manual) this.tooltip.hide();
       return;
     }
+    if (this.moveMode && this.mode === 'game') {
+      const player = this.session.player;
+      const unit = player.military.units.find((u) => u.id === this.moveMode.unitIds[0]);
+      const plan = unit ? planMove(state, player, unit, regionId) : { error: 'Verband nicht gefunden.' };
+      this.moveTargetOk = !plan.error;
+      const what = plan.error ? `<span class="bad">${esc(plan.error)}</span>` : plan.type === 'attack' ? '<span class="bad">Angriff</span>' : plan.type === 'landing' ? `Landung über See (${plan.days} Tage)` : `Verlegung: ${plan.days} Tage${plan.type === 'sea' ? ' (Seeweg)' : ''}`;
+      const n = this.moveMode.unitIds.length;
+      this.tooltip.showAt(`<b>${esc(STATIC_REGIONS[regionId].name)}</b><br>${n > 1 ? `${n} Verbände · ` : unit ? `${esc(unitLabel(unit))} · ` : ''}${what}`, ev.clientX, ev.clientY);
+      return;
+    }
     const mode = MAP_MODE_BY_ID[this.mapMode];
-    this.tooltip.showAt(`<b>${flagEmoji(c.iso2)} ${esc(c.name)}</b><br>${esc(mode.value(state, c, this))}`, ev.clientX, ev.clientY);
+    const ctrl = r.controller !== r.owner ? `<br><span class="bad">Besetzt durch ${esc(state.countries[r.controller].name)}</span>` : '';
+    const siege = r.siege ? `<br><span class="warn">Belagerung ${Math.round(r.siege.progress)} %</span>` : '';
+    this.tooltip.showAt(`<b>${esc(STATIC_REGIONS[regionId].name)}</b> · ${flagEmoji(c.iso2)} ${esc(c.name)}${ctrl}${siege}<br>${esc(mode.value(state, c, this))}`, ev.clientX, ev.clientY);
   }
 
   /** Major news about the player's country (or the whole world) appear as a toast. */
@@ -568,6 +753,15 @@ export class UIManager {
     const bus = this.session.bus;
     bus.on('day', () => {
       this.mark('top', 'news', 'events');
+      // fronts, sieges and marching formations change daily during wars
+      if (this.session.state.wars.some((w) => w.status === 'active')) {
+        this.mark('map');
+        if (this.activePanel === 'wars' || this.selectedRegion) this.dailyWarRefresh = (this.dailyWarRefresh ?? 0) + 1;
+        if (this.dailyWarRefresh >= 7) {
+          this.dailyWarRefresh = 0;
+          this.mark('drawer', 'info');
+        }
+      }
       this.announceNews();
     });
     bus.on('month', () => {
@@ -581,6 +775,10 @@ export class UIManager {
       }
     });
     bus.on('speed', () => this.mark('top'));
+    bus.on('interrupted', (info) => this.onInterrupted(info));
+    bus.on('war:declared', () => this.markAll());
+    bus.on('war:ended', () => this.markAll());
+    bus.on('region:control', () => this.mark('map', 'info'));
     bus.on('event:pending', () => this.mark('events'));
     bus.on('event:resolved', () => this.mark('events'));
     bus.on('state:replaced', (state) => {
@@ -588,4 +786,18 @@ export class UIManager {
       this.markAll();
     });
   }
+}
+
+/** Builds a command from a form: data-cmd-form holds the fixed part, fields add the rest. */
+function formCommand(form) {
+  const cmd = JSON.parse(form.dataset.cmdForm);
+  for (const el of form.elements) {
+    if (!el.name || el.disabled) continue;
+    if (el.name === 'product') {
+      const [kind, item] = el.value.split(':');
+      cmd.kind = kind;
+      cmd.item = item;
+    } else cmd[el.name] = el.type === 'number' ? Number(el.value) : el.value;
+  }
+  return cmd;
 }

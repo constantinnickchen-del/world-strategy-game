@@ -18,11 +18,18 @@ const EVENT_LOG_LIMIT = 100;
 const COUNTRY_EVENTS = EVENTS.filter((e) => e.scope === 'country');
 const WORLD_EVENTS = EVENTS.filter((e) => e.scope === 'world');
 
+export function eventTitle(state, instance) {
+  return fillTemplate(state, instance, EVENT_BY_ID[instance.eventId].title);
+}
+
 export function eventText(state, instance) {
-  const def = EVENT_BY_ID[instance.eventId];
+  return fillTemplate(state, instance, EVENT_BY_ID[instance.eventId].text);
+}
+
+function fillTemplate(state, instance, template) {
   const c = instance.countryId ? state.countries[instance.countryId] : null;
   const o = instance.otherId ? state.countries[instance.otherId] : null;
-  return def.text
+  return template
     .replaceAll('{country}', c?.name ?? 'der Welt')
     .replaceAll('{other}', o?.name ?? '')
     .replaceAll('{treaty}', instance.data?.treaty ? TREATIES[instance.data.treaty].name : '')

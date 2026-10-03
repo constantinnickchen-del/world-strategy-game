@@ -33,6 +33,17 @@
   display: none;
 }
 
+/* the military command and the war room need room for tables */
+#drawer[data-panel='military'],
+#drawer[data-panel='wars'] {
+  width: min(680px, calc(100vw - var(--sidebar-w) - var(--info-w) - 520px));
+  min-width: var(--drawer-w);
+}
+
+body.is-move-mode #map {
+  cursor: cell;
+}
+
 #map-wrap {
   grid-area: map;
   position: relative;
@@ -87,6 +98,13 @@ body.is-setup #app {
 
   #app {
     grid-template-columns: var(--sidebar-w) 0 1fr 0;
+  }
+
+  #drawer,
+  #drawer[data-panel='military'],
+  #drawer[data-panel='wars'] {
+    width: min(680px, calc(100vw - var(--sidebar-w)));
+    min-width: 0;
   }
 
   #drawer {

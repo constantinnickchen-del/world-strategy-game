@@ -4,6 +4,7 @@
 import { formatDateDE } from '../../core/calendar.js';
 import { esc } from '../../util/format.js';
 import { GAME_VERSION } from '../../version.js';
+import { PAUSE_REASONS } from '../../core/settings.js';
 
 const TABS = [
   ['saves', 'Spielstände'],
@@ -102,12 +103,16 @@ export class MenuModal {
         </label>
         <label class="check"><input type="checkbox" data-action-change="setSetting" data-key="pauseOnEvents"${s.pauseOnEvents ? ' checked' : ''}> Bei Ereignissen pausieren</label>
         <label class="check"><input type="checkbox" data-action-change="setSetting" data-key="showLabels"${s.showLabels ? ' checked' : ''}> Ländernamen auf der Karte anzeigen</label>
+        <h4 class="kbd-title">Automatisch pausieren bei …</h4>
+        <p class="muted small">Die Simulation stoppt sofort am Tag des Ereignisses – auch bei maximaler Geschwindigkeit. Ist ein Punkt abgewählt, entscheidet Ihr Beraterstab die zugehörige Krise selbst.</p>
+        <div class="pause-settings">${PAUSE_REASONS.map((r) => `<label class="check" data-tip="${esc(r.hint)}"><input type="checkbox" data-action-change="setPauseSetting" data-key="${r.id}"${(s.pauseOn ?? {})[r.id] !== false ? ' checked' : ''}> ${r.label}</label>`).join('')}</div>
         <h4 class="kbd-title">Tastenkürzel</h4>
         <table class="table small">
           <tr><td><span class="kbd">Leertaste</span></td><td>Pause / Fortsetzen</td></tr>
-          <tr><td><span class="kbd">1</span>–<span class="kbd">3</span>, <span class="kbd">+</span>/<span class="kbd">−</span></td><td>Geschwindigkeit</td></tr>
-          <tr><td><span class="kbd">Q W E R T Z U I O</span></td><td>Panels öffnen</td></tr>
-          <tr><td><span class="kbd">Esc</span></td><td>Schließen / Menü</td></tr>
+          <tr><td><span class="kbd">1</span>–<span class="kbd">4</span>, <span class="kbd">+</span>/<span class="kbd">−</span></td><td>Geschwindigkeit (4 = Maximal)</td></tr>
+          <tr><td><span class="kbd">Q W E R T Z U K I O</span></td><td>Panels öffnen (U = Militär, K = Kriege)</td></tr>
+          <tr><td><span class="kbd">Esc</span></td><td>Verlegung abbrechen / Schließen / Menü</td></tr>
+          <tr><td>Klick auf Region</td><td>Region und Land auswählen; im Verlegungsmodus: Zielregion</td></tr>
           <tr><td>Mausrad, Ziehen, Doppelklick</td><td>Karte zoomen und verschieben</td></tr>
         </table>`;
     } else if (this.tab === 'game') {

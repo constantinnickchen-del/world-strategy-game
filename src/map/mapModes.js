@@ -8,6 +8,23 @@ import { getOpinion, hasTreaty, hasEmbargo } from '../systems/diplomacy.js';
 import { RESOURCES } from '../data/resources.js';
 import { formatUsd, formatPct, formatNumber, formatSignedPct } from '../util/format.js';
 import { IDEOLOGIES, GOVERNMENTS } from '../data/governments.js';
+import { warsOf, sideOf, otherSide, isAtWar } from '../systems/war/wars.js';
+
+/** War situation of a country from the player's point of view. */
+function warRelation(state, c) {
+  const p = state.playerId;
+  if (c.id === p) return 'player';
+  for (const w of warsOf(state, p)) {
+    const side = sideOf(w, p);
+    if (w[otherSide(side)].includes(c.id)) return 'enemy';
+    if (w[side].includes(c.id)) return 'comrade';
+  }
+  if (hasTreaty(state, p, c.id, 'alliance')) return 'ally';
+  return isAtWar(state, c.id) ? 'war' : 'neutral';
+}
+
+const WAR_COLORS = { player: '#c8a25a', enemy: '#c4553b', comrade: '#3fa796', ally: '#2f6f88', war: '#b8813a', neutral: '#2e3a46' };
+const WAR_LABELS = { player: 'Ihr Land', enemy: 'Kriegsgegner', comrade: 'Kriegspartner', ally: 'Verbündet (nicht im Krieg)', war: 'Im Krieg (ohne Sie)', neutral: 'Neutral / Frieden' };
 
 // Single-hue sequential ramp (brass), dark -> light on the dark map surface.
 const SEQ = ['#2a2f33', '#4a4330', '#6f5f37', '#957b3d', '#bb9846', '#dcb85e', '#f2d690'];
@@ -56,6 +73,20 @@ export const MAP_MODES = [
     color: (state, c) => c.color,
     legend: () => ({ type: 'text', text: 'Länder und ihre Gebiete' }),
     value: (state, c) => `${GOVERNMENTS[c.politics.government].name} · ${IDEOLOGIES[c.politics.ideology].name}`,
+  },
+  {
+    id: 'war',
+    name: 'Krieg & Kontrolle',
+    icon: '⚔',
+    needsPlayer: true,
+    byController: true, // regions are coloured by who controls them, the owner shows as hatching
+    color: (state, c) => WAR_COLORS[warRelation(state, c)],
+    legend: () => ({ type: 'swatches', items: Object.keys(WAR_COLORS).map((k) => [WAR_COLORS[k], WAR_LABELS[k]]) }),
+    value: (state, c) => {
+      const rel = warRelation(state, c);
+      const wars = warsOf(state, c.id);
+      return `${WAR_LABELS[rel]}${wars.length ? ` · ${wars.map((w) => w.name).join(', ')}` : ''}`;
+    },
   },
   {
     id: 'relations',

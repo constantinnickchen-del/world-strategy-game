@@ -8,7 +8,17 @@
  * Without a target (or if it is not found) the bubble is centred.
  */
 import { esc } from '../../util/format.js';
-import { neighborCountryIds } from '../../state/worldIndex.js';
+import { neighborCountryIds, STATIC_REGIONS } from '../../state/worldIndex.js';
+
+/** A foreign region on the player's border (for the war/region step). */
+function borderRegion(ui) {
+  const state = ui.session.state;
+  const p = ui.session.player;
+  for (const rid of p.regionIds) {
+    for (const n of STATIC_REGIONS[rid].neighbors) if (state.regions[n] && state.regions[n].owner !== p.id) return n;
+  }
+  return null;
+}
 
 function firstForeignCountry(ui) {
   const state = ui.session.state;
@@ -25,7 +35,7 @@ export const TUTORIAL_STEPS = [
   {
     target: '.chrono',
     title: 'Die Zeit',
-    text: 'Hier sehen Sie das Datum. Mit den Pfeilen starten Sie die Zeit in drei Geschwindigkeiten, mit ❚❚ halten Sie sie an. Am schnellsten geht es mit der <span class="kbd">Leertaste</span>.',
+    text: 'Hier sehen Sie das Datum. Mit den Pfeilen starten Sie die Zeit in vier Geschwindigkeiten (⏩ = Maximal), mit ❚❚ halten Sie sie an. Am schnellsten geht es mit der <span class="kbd">Leertaste</span>.',
   },
   {
     target: '.top-stats',
@@ -80,6 +90,30 @@ export const TUTORIAL_STEPS = [
     text: (ui) =>
       `Wenn Sie ein anderes Land anklicken – hier zum Beispiel <b>${esc(ui.session.state.countries[firstForeignCountry(ui)]?.name ?? '')}</b> –, können Sie die Beziehungen verbessern und Verträge vorschlagen. Graue Buttons sind gerade nicht möglich; die Maus darüber verrät warum.`,
     prepare: (ui) => ui.setTutorialLayout({ panel: null, select: firstForeignCountry(ui) }),
+  },
+  {
+    target: '[data-tut="military-dash"]',
+    title: 'Militär',
+    text: 'Das Militär-Dashboard zeigt Heer, Luftwaffe, Marine, Rüstungsindustrie und Logistik – alles aus echten Verbänden, Flugzeugen, Schiffen und Lagern. Über die Reiter oben stellen Sie Verbände auf, geben Produktion in Auftrag, kaufen Rüstungsgüter im Ausland und bauen Stützpunkte.',
+    prepare: (ui) => ui.setTutorialLayout({ panel: 'military', select: null, militaryTab: 'overview' }),
+  },
+  {
+    target: '[data-tut="region"]',
+    title: 'Regionen, Truppen und Krieg',
+    text: 'Jedes Land besteht aus Regionen mit Eigentümer und Kontrolle. <b>Klicken Sie auf eine Region</b>: Hier sehen Sie Wirtschaft, Rohstoffe, Anlagen und Truppen. Über <b>„Krieg erklären…“</b> wählen Sie Kriegsziele und sehen vorher Kräfteverhältnis und Folgen. Verbände verlegen Sie mit „Verlegen“ und einem Klick auf die Zielregion – eine feindliche Nachbarregion wird angegriffen.',
+    prepare: (ui) => {
+      const rid = borderRegion(ui);
+      const owner = rid ? ui.session.state.regions[rid].owner : null;
+      ui.setTutorialLayout({ panel: null, select: owner, region: rid });
+      if (rid) ui.map.focusRegion(rid, 6);
+    },
+    fallbackTarget: '#infopanel',
+  },
+  {
+    target: '#sidebar [data-panel="wars"]',
+    title: 'Kriege & automatische Pause',
+    text: 'Bricht irgendwo ein Krieg aus, hält das Spiel <b>sofort</b> an – auch bei höchster Geschwindigkeit – und Sie entscheiden, wie Ihr Land reagiert. Die Kriegsübersicht ⚔ zeigt alle Kriege mit Fronten, Kriegslage und Friedensverhandlungen. Wann pausiert wird, stellen Sie im Menü ☰ unter „Einstellungen“ ein.',
+    prepare: (ui) => ui.setTutorialLayout({ panel: 'wars', select: null }),
   },
   {
     target: '#newsfeed',

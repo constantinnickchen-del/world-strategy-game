@@ -1843,3 +1843,502 @@ body.is-setup .map-modes {
   background: none;
   color: var(--muted);
 }
+
+/* ==========================================================================
+   Military, war room, regions
+   ========================================================================== */
+.sub-head {
+  margin: 12px 0 6px;
+  font: 600 11px/1.2 var(--font-cond);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.chip-bad {
+  border-color: #6b3428;
+  color: #f0b4a4;
+}
+
+.chip-warn {
+  border-color: #7a5d26;
+  color: var(--warn);
+  background: none;
+}
+
+button.chip {
+  background: none;
+  cursor: pointer;
+}
+
+.list-sum {
+  border-top: 1px solid var(--line-strong);
+  font-weight: 700;
+}
+
+.nav-badge.is-war {
+  width: auto;
+  height: auto;
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--bad);
+  color: #fff;
+  font: 700 10px/16px var(--font-cond);
+  text-align: center;
+}
+
+.region-status {
+  margin: 6px 0;
+  padding: 5px 8px;
+  border-left: 3px solid var(--line-strong);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.region-status.tone-good {
+  border-color: var(--good);
+}
+
+.region-status.tone-bad {
+  border-color: var(--bad);
+  color: #f0b4a4;
+}
+
+.region-status.tone-warn {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+/* tabs */
+.tab-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tab-btn {
+  padding: 7px 10px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--ink-2);
+  font: 600 12px/1.2 var(--font-cond);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tab-btn:hover {
+  color: var(--ink);
+}
+
+.tab-btn.is-active {
+  border-bottom-color: var(--brass);
+  color: var(--brass-bright);
+}
+
+/* dashboard */
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.dash-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-top: 2px solid var(--brass-dim);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  color: var(--ink);
+  text-align: left;
+}
+
+.dash-card:hover {
+  border-color: var(--brass);
+}
+
+.dash-card h4 {
+  margin: 0 0 4px;
+  font: 700 12px/1.2 var(--font-cond);
+  letter-spacing: 0.14em;
+  color: var(--brass-bright);
+}
+
+.dash-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.dash-row b {
+  color: var(--ink);
+}
+
+.dash-row b.good {
+  color: var(--good);
+}
+
+.dash-row b.bad {
+  color: var(--bad);
+}
+
+.dash-row b.warn {
+  color: var(--warn);
+}
+
+/* data tables */
+.table-wrap {
+  overflow-x: auto;
+  margin: 6px 0;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.data-table th,
+.data-table td {
+  padding: 4px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.data-table th {
+  font: 600 10.5px/1.2 var(--font-cond);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.data-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.data-table td.small {
+  white-space: normal;
+  min-width: 90px;
+}
+
+.data-table .meter {
+  margin-top: 3px;
+  min-width: 70px;
+}
+
+.data-table .tip-sum td {
+  border-top: 1px solid var(--line-strong);
+  font-weight: 700;
+}
+
+.row-actions {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.btn-sm {
+  min-height: 24px;
+  padding: 1px 7px;
+  font-size: 11.5px;
+}
+
+.btn.is-on {
+  box-shadow: inset 0 0 0 1px var(--brass);
+}
+
+.seg-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  margin: 6px 0;
+}
+
+.inline-form .field {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.inline-form .field.grow {
+  flex: 3 1 240px;
+}
+
+.inline-form .field select {
+  width: 100%;
+}
+
+.inline-form.compact {
+  flex-wrap: nowrap;
+  margin: 0;
+  gap: 4px;
+}
+
+.inline-form.compact input {
+  width: 74px;
+  min-height: 26px;
+  padding: 2px 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: #0e1820;
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.unit-list li span:first-child {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.devline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.devline-step {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  min-width: 120px;
+}
+
+.devline-step.is-ready {
+  border-color: var(--good);
+}
+
+.devline-arrow {
+  color: var(--brass);
+  font-size: 18px;
+}
+
+.fleet-card,
+.supplier-card {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.fleet-card header,
+.supplier-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.supplier-card.is-refused {
+  opacity: 0.7;
+  border-color: #6b3428;
+}
+
+.sup-row {
+  display: grid;
+  grid-template-columns: 150px 1fr 70px;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+/* war room */
+.war-card {
+  margin: 8px 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.war-card.is-player {
+  border-color: #6b3428;
+}
+
+.war-card.is-open {
+  padding: 0 10px 10px;
+}
+
+.war-head {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  text-align: left;
+}
+
+.war-card.is-open .war-head {
+  padding: 8px 0;
+}
+
+.war-name {
+  font-weight: 700;
+}
+
+.war-card.is-player .war-name {
+  color: #f0b4a4;
+}
+
+.war-mini {
+  display: grid;
+  grid-template-columns: 1fr 40px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px 8px;
+}
+
+.war-sides {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.war-score-row {
+  display: grid;
+  grid-template-columns: auto 1fr 40px;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.war-score {
+  height: 10px;
+}
+
+.peace-builder {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.goal-list {
+  max-height: 260px;
+  overflow-y: auto;
+  margin: 4px 0 8px;
+}
+
+.goal-row {
+  display: grid;
+  grid-template-columns: 20px 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.goal-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.goal-row.is-on {
+  background: rgba(200, 162, 90, 0.1);
+}
+
+.goal-tags {
+  display: flex;
+  gap: 4px;
+}
+
+.war-modal {
+  width: min(860px, 100%);
+}
+
+.war-modal-grid {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 10px;
+}
+
+.consequences {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+}
+
+.event-modal.is-crisis .modal-head {
+  border-bottom-color: var(--bad);
+}
+
+.event-modal.is-crisis .modal-head h2 {
+  color: #f0b4a4;
+}
+
+.crisis-paused {
+  padding: 4px 8px;
+  border-left: 3px solid var(--warn);
+  color: var(--warn);
+}
+
+.crisis-analysis {
+  margin: 8px 0 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.crisis-analysis summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--brass-bright);
+}
+
+.event-option.is-blocked {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.pause-settings {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 12px;
+}
+
+.pause-settings .check {
+  margin: 6px 0;
+}
+
+@media (max-width: 760px) {
+  .war-modal-grid,
+  .war-sides,
+  .pause-settings {
+    grid-template-columns: 1fr;
+  }
+
+  .sup-row {
+    grid-template-columns: 110px 1fr 60px;
+  }
+}
+
+.crisis-analysis .list li {
+  flex-wrap: wrap;
+}

@@ -13,6 +13,14 @@ export function formatBn(bn) {
   return `${sign}${NF0.format(a * 1000)} Mio. $`;
 }
 
+/** Prices of single items: also below one million dollars. */
+export function formatPrice(bn) {
+  const a = Math.abs(bn);
+  if (a >= 0.001) return formatBn(bn);
+  if (a * 1e6 >= 1) return `${NF0.format(a * 1e6)} Tsd. $`;
+  return `${NF0.format(a * 1e9)} $`;
+}
+
 export function formatPopulation(n) {
   if (n >= 1e9) return `${NF2.format(n / 1e9)} Mrd.`;
   if (n >= 1e6) return `${NF1.format(n / 1e6)} Mio.`;

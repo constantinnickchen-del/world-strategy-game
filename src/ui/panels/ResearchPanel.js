@@ -1,8 +1,8 @@
 import { TECHNOLOGIES, TECH_BY_ID, TECH_CATEGORIES } from '../../data/technologies.js';
-import { techCost, isResearched, canResearch } from '../../systems/technology.js';
+import { techCost, isResearched, canResearch, focusMultiplier } from '../../systems/technology.js';
 import { STATS, formatModValue, isPositiveMod } from '../../systems/modifiers.js';
 import { formatNumber, formatPct, esc } from '../../util/format.js';
-import { section, meter, cmdButton } from '../widgets.js';
+import { section, meter, cmdButton, slider } from '../widgets.js';
 
 function effects(tech) {
   return tech.effects.map((e) => `<span class="${isPositiveMod(e.stat, e.value) ? 'good' : 'bad'}">${STATS[e.stat].label} ${formatModValue(e.stat, e.value)}</span>`).join(' · ');
@@ -21,7 +21,7 @@ export const ResearchPanel = {
       ? (() => {
           const cost = techCost(state, cur.id);
           const done = t.progress[cur.id] ?? 0;
-          const months = pts > 0 ? Math.ceil((cost - done) / pts) : Infinity;
+          const months = pts > 0 ? Math.ceil((cost - done) / (pts * focusMultiplier(c, cur.id))) : Infinity;
           return `<p><b>${esc(cur.name)}</b></p>${meter((done / cost) * 100, { tone: 'teal' })}<p class="muted small">${formatNumber(done)} / ${formatNumber(cost)} Punkte · noch ca. ${Number.isFinite(months) ? `${months} Monate` : '∞'}</p>
             <p class="small">${effects(cur)}</p>${cmdButton(ui, 'Projekt pausieren', { type: 'setResearch', techId: null }, { tip: 'Der bisherige Fortschritt bleibt erhalten.' })}`;
         })()
@@ -53,6 +53,17 @@ export const ResearchPanel = {
         return section(`${cat.icon} ${cat.name}`, `<ul class="tech-list">${items}</ul>`);
       })
       .join('');
-    return `${section('Aktuelles Projekt', `${curHtml}<p class="muted small">Forschungspunkte: <b class="num">${formatNumber(pts, 1)}</b> pro Monat (abhängig von Forschungsbudget, Entwicklungsstand, Wirtschaftsgröße und Stabilität).</p>`, { tut: 'research' })}${cats}`;
+    const focus = t.focus ?? 0.5;
+    const focusHtml = slider({
+      cmd: { type: 'setResearchFocus' },
+      value: Math.round(focus * 100),
+      min: 0,
+      max: 100,
+      step: 5,
+      label: 'Schwerpunkt: zivil ← → militärisch',
+      display: `${Math.round(focus * 100)} % militärisch`,
+      tip: `Verteilt die Forschungsressourcen: Militärtechnologien laufen mit ${formatPct(0.6 + 0.8 * focus, 0)}, zivile mit ${formatPct(1.4 - 0.8 * focus, 0)} Geschwindigkeit.`,
+    });
+    return `${section('Aktuelles Projekt', `${curHtml}<p class="muted small">Forschungspunkte: <b class="num">${formatNumber(pts, 1)}</b> pro Monat (abhängig von Forschungsbudget, Entwicklungsstand, Wirtschaftsgröße und Stabilität).</p>`, { tut: 'research' })}${section('Forschungspriorität', `${focusHtml}<p class="muted small">Militärisch: ${formatPct(0.6 + 0.8 * focus, 0)} · Zivil: ${formatPct(1.4 - 0.8 * focus, 0)} Forschungsgeschwindigkeit.</p>`)}${cats}`;
   },
 };

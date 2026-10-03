@@ -7,6 +7,7 @@ export const NAV_ITEMS = [
   { id: 'trade', icon: '⚖', label: 'Handel & Rohstoffe', key: 'T' },
   { id: 'research', icon: '🔬', label: 'Forschung', key: 'Z' },
   { id: 'military', icon: '🛡', label: 'Militär', key: 'U' },
+  { id: 'wars', icon: '⚔', label: 'Kriege', key: 'K' },
   { id: 'world', icon: '🌍', label: 'Weltlage', key: 'I' },
   { id: 'news', icon: '📰', label: 'Nachrichten', key: 'O' },
 ];
@@ -30,5 +31,13 @@ export class Sidebar {
     const player = this.ui.session.player;
     const research = this.el.querySelector('[data-badge="research"]');
     if (research) research.hidden = !player || !!player.technology.current;
+    const wars = this.el.querySelector('[data-badge="wars"]');
+    if (wars) {
+      const state = this.ui.session.state;
+      const n = player ? state.wars.filter((w) => w.status === 'active' && (w.attackers.includes(player.id) || w.defenders.includes(player.id))).length : 0;
+      wars.hidden = !n;
+      wars.textContent = n ? String(n) : '';
+      wars.classList.toggle('is-war', n > 0);
+    }
   }
 }

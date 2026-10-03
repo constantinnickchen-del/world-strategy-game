@@ -7,9 +7,11 @@ import { gdpPerCapita, debtRatio } from '../../state/selectors.js';
 import { getOpinion, hasTreaty, hasEmbargo, evaluateProposal, TREATIES } from '../../systems/diplomacy.js';
 import { neighborCountryIds } from '../../state/worldIndex.js';
 import { improveRelationsCost } from '../../commands/commands.js';
-import { formatBn, formatPct, formatSignedPct, formatPopulation, formatUsd, esc } from '../../util/format.js';
+import { formatBn, formatPct, formatSignedPct, formatPopulation, formatUsd, formatNumber, esc } from '../../util/format.js';
 import { flag, stat, meter, opinionBar, section, cmdButton, actionButton, signClass, tipAttr } from '../widgets.js';
 import { gdpTip, approvalTip, stabilityTip, debtTip } from '../tips.js';
+import { renderRegionSection } from './RegionInfo.js';
+import { warsOf, areEnemies, sideOf } from '../../systems/war/wars.js';
 
 export function countryLink(state, id) {
   const c = state.countries[id];
@@ -49,6 +51,8 @@ export class InfoPanel {
         <span class="chip">${GOVERNMENTS[c.politics.government].name}</span>
         <span class="chip" style="--chip:${IDEOLOGIES[c.politics.ideology].color}">${IDEOLOGIES[c.politics.ideology].name}</span>
         ${isPlayer ? '<span class="chip chip-brass">Ihr Land</span>' : ''}
+        ${p && !isPlayer && areEnemies(state, p, id) ? '<span class="chip chip-bad">Kriegsgegner</span>' : ''}
+        ${warsOf(state, id).length ? `<button class="chip chip-warn" data-action="openPanel" data-panel="wars">⚔ Im Krieg (${warsOf(state, id).length})</button>` : ''}
       </div>`;
     const stats = `<div class="stat-grid">
         ${stat('BIP', formatBn(e.gdp), { tip: gdpTip(c) })}
@@ -89,6 +93,7 @@ export class InfoPanel {
            ${proposals}
            ${cancels}
            ${cmdButton(ui, embargoOut ? 'Embargo aufheben' : 'Handelsembargo verhängen', { type: 'setEmbargo', targetId: id, active: !embargoOut }, { cls: embargoOut ? '' : 'btn-danger', confirm: embargoOut ? '' : `Handelsembargo gegen ${c.name} verhängen? Der Handel wird vollständig unterbrochen und die Beziehungen leiden.` })}
+           ${areEnemies(state, p, id) ? actionButton('Kriegsübersicht', 'openPanel', { panel: 'wars' }, { cls: 'btn-danger' }) : actionButton('Krieg erklären…', 'openDeclareWar', { target: id }, { cls: 'btn-danger', tip: 'Kriegsziele wählen, Bündnisse und Kräfteverhältnis prüfen – erst nach Bestätigung wird der Krieg erklärt.' })}
          </div>`,
         { tut: 'diplomacy' },
       );
@@ -106,7 +111,18 @@ export class InfoPanel {
     const neighbors = neighborCountryIds(state, id);
     const nb = neighbors.length ? `<div class="tag-list">${neighbors.map((n) => countryLink(state, n)).join('')}</div>` : '<p class="muted small">Keine Landgrenzen.</p>';
 
-    this.el.innerHTML = `<div class="panel-scroll">${head}${stats}${diplomacy}${chart}${section('Wichtigste Rohstoff-Handelspartner', partners)}${section('Nachbarn', nb)}</div>`;
+    const region = ui.selectedRegion && state.regions[ui.selectedRegion]?.owner === id ? renderRegionSection(ui, ui.selectedRegion) : '';
+    const military = section(
+      'Streitkräfte',
+      `<div class="stat-grid">
+        ${stat('Militärstärke', formatNumber(c.military.power))}
+        ${stat('Aktive Soldaten', formatPopulation(c.military.activePersonnel ?? 0))}
+        ${stat('Verbände', String(c.military.units.filter((u) => u.status === 'active').length))}
+        ${stat('Flugzeuge / Schiffe', `${formatNumber(Object.values(c.military.aircraft).reduce((s, a) => s + a.count, 0))} / ${formatNumber(c.military.fleets.reduce((s, f) => s + Object.values(f.ships).reduce((a, n) => a + n, 0), 0))}`)}
+      </div>
+      ${warsOf(state, id).map((w) => `<p class="small"><span class="${sideOf(w, p) ? 'bad' : 'warn'}">⚔ ${esc(w.name)}</span></p>`).join('')}`,
+    );
+    this.el.innerHTML = `<div class="panel-scroll">${head}${region}${stats}${diplomacy}${military}${chart}${section('Wichtigste Rohstoff-Handelspartner', partners)}${section('Nachbarn', nb)}</div>`;
   }
 
   charts() {

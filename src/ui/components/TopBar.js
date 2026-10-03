@@ -10,7 +10,7 @@ import { debtRatio } from '../../state/selectors.js';
 import { gdpTip, budgetTip, debtTip, inflationTip, approvalTip, stabilityTip, unemploymentTip } from '../tips.js';
 import { GAME_TITLE } from '../../version.js';
 
-const SPEED_ICONS = ['❚❚', '▶', '▶▶', '▶▶▶'];
+const SPEED_ICONS = ['❚❚', '▶', '▶▶', '▶▶▶', '⏩'];
 
 export class TopBar {
   constructor(el, ui) {
@@ -26,7 +26,7 @@ export class TopBar {
         <span class="flag" data-k="flag"></span><span class="player-name" data-k="name"></span>
       </button>
       <div class="chrono topbar-game" role="group" aria-label="Zeitsteuerung">
-        <div class="chrono-date" data-tip="Leertaste: Pause/Fortsetzen · 1–3: Geschwindigkeit · +/−: schneller/langsamer">
+        <div class="chrono-date" data-tip="Leertaste: Pause/Fortsetzen · 1–4: Geschwindigkeit · +/−: schneller/langsamer">
           <span class="chrono-day num" data-k="date"></span>
         </div>
         <div class="chrono-speeds">
