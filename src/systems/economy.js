@@ -13,7 +13,9 @@
 import { RESOURCE_IDS } from '../data/resources.js';
 import { getMod, addModifier } from './modifiers.js';
 import { addNews } from './news.js';
-import { gdpPerCapita, totalSpendingShare } from '../state/selectors.js';
+import { gdpPerCapita, BUDGET_IDS } from '../state/selectors.js';
+import { computeGdp } from '../state/territory.js';
+import { mobilizationEffects } from './military/manpower.js';
 import { clamp, monthlyFactor } from '../util/math.js';
 
 /** Long-run potential growth: poorer economies can catch up faster. */
@@ -61,7 +63,13 @@ export function updateBudget(c, { book = true } = {}) {
   const resourceRent = Math.min(c.trade.exports * e.rentShare, e.gdp * 0.35) / 12;
   e.interestRate += (interestRateTarget(c, e.debt / e.gdp) - e.interestRate) * 0.05;
   const interest = (e.debt * e.interestRate) / 12;
-  const spending = (e.gdp * totalSpendingShare(c)) / 12;
+  // Civil budget lines are spent in full; the defence budget is a ceiling – only what
+  // the armed forces actually used last month is booked (see systems/military/budget.js).
+  let civil = 0;
+  for (const id of BUDGET_IDS) if (id !== 'military') civil += c.budget[id];
+  const mil = c.military?.spending?.budget > 0 ? c.military.spending.total : (e.gdp * c.budget.military) / 12;
+  e.lastMilitarySpending = mil;
+  const spending = (e.gdp * civil) / 12 + mil;
   const balance = revenue + resourceRent - spending - interest;
   e.lastRevenue = revenue;
   e.lastResourceRent = resourceRent;
@@ -105,6 +113,7 @@ export function stepEconomy(state, c, rng) {
   const debtRatio = e.debt / gdp;
 
   // --- Growth -----------------------------------------------------------------
+  const mob = mobilizationEffects(state, c);
   const potential = potentialGrowth(c);
   e.potentialGrowth = potential;
   const stabilityFactor = 0.4 + 0.8 * (c.politics.stability / 100);
@@ -126,9 +135,16 @@ export function stepEconomy(state, c, rng) {
     shortagePenalty +
     debtDrag +
     getMod(c, 'growth') +
+    mob.growth +
     e.growthShock;
   e.growth = clamp(e.growth + (target - e.growth) * 0.3, -0.2, 0.2);
-  e.gdp = Math.max(0.01, gdp * monthlyFactor(e.growth));
+  // Output grows in the regions the country owns and controls; occupied regions stagnate.
+  const f = monthlyFactor(e.growth);
+  for (const rid of c.regionIds) {
+    const r = state.regions[rid];
+    if (r.controller === c.id) r.econ *= f;
+  }
+  e.gdp = computeGdp(state, c);
 
   // --- Inflation ----------------------------------------------------------------
   const overheating = 0.4 * clamp(e.growth - potential, -0.03, 0.05);
@@ -143,7 +159,7 @@ export function stepEconomy(state, c, rng) {
 
   // --- Unemployment (Okun) -------------------------------------------------------
   e.naturalUnemployment += (0.06 - e.naturalUnemployment) * 0.002; // structural unemployment slowly normalises
-  const uTarget = e.naturalUnemployment - 0.45 * (e.growth - potential) + getMod(c, 'unemployment');
+  const uTarget = e.naturalUnemployment - 0.45 * (e.growth - potential) + getMod(c, 'unemployment') + mob.unemployment;
   e.unemployment = clamp(e.unemployment + (uTarget - e.unemployment) * 0.1, 0.01, 0.45);
 
   updateBudget(c);
@@ -158,7 +174,7 @@ export function stepEconomy(state, c, rng) {
  * debt is far beyond what markets tolerate, the state restructures its debt.
  * Painful (stability, approval, years of high rates) but stops endless spirals.
  */
-export function checkSovereignDefault(state, c) {
+export function checkSovereignDefault(state, c, ctx = null) {
   const e = c.economy;
   const realInterest = Math.max(0, e.interestRate - e.inflation) * e.debt;
   const revenue = e.lastRevenue * 12 + e.lastResourceRent * 12;
@@ -175,6 +191,7 @@ export function checkSovereignDefault(state, c) {
     importance: c.id === state.playerId ? 3 : 2,
     text: `Staatsbankrott: ${c.name} kann seine Schulden nicht mehr bedienen. 60 % der Staatsschulden werden gestrichen.`,
   });
+  ctx?.bus?.emit('interrupt', { kind: 'bankruptcy', countryId: c.id });
   return true;
 }
 
@@ -185,7 +202,7 @@ export const economySystem = {
       const c = state.countries[id];
       if (c.eliminated) continue;
       stepEconomy(state, c, ctx.rng);
-      checkSovereignDefault(state, c);
+      checkSovereignDefault(state, c, ctx);
     }
   },
 };

@@ -14,6 +14,7 @@ test('projection: north is up, monotonic, clamped', () => {
 });
 
 test('hit testing finds the right countries', () => {
+  const s = newState();
   const cases = [
     [[10.4, 51.1], 'DEU'], // Germany
     [[2.3, 46.6], 'FRA'],
@@ -21,12 +22,13 @@ test('hit testing finds the right countries', () => {
     [[-55, -10], 'BRA'],
     [[78, 22], 'IND'],
     [[134, -25], 'AUS'],
-    [[-42, 72], 'GRL'], // Greenland (region owned by Denmark)
+    [[-42, 72], 'DNK'], // Greenland (region owned by Denmark)
     [[-30, 30], null], // Atlantic
   ];
   for (const [[lon, lat], expected] of cases) {
     const [x, y] = project(lon, lat);
-    assert.equal(hitTest(geometry, x, y), expected, `${lon},${lat}`);
+    const rid = hitTest(geometry, x, y);
+    assert.equal(rid ? s.regions[rid].owner : null, expected, `${lon},${lat}`);
   }
 });
 

@@ -12,6 +12,7 @@ export const SPEEDS = [
   { id: 1, label: 'Normal', daysPerSecond: 2 },
   { id: 2, label: 'Schnell', daysPerSecond: 8 },
   { id: 3, label: 'Sehr schnell', daysPerSecond: 30 },
+  { id: 4, label: 'Maximal', daysPerSecond: 90, maxDaysPerUpdate: 8 },
 ];
 
 export class GameClock {
@@ -56,8 +57,9 @@ export class GameClock {
     const dt = Math.min(Math.max(0, elapsedMs), this.maxFrameMs);
     this.accumulator += (dt / 1000) * SPEEDS[this.speed].daysPerSecond;
     let days = Math.floor(this.accumulator + 1e-9); // tolerate float accumulation error
-    if (days > this.maxDaysPerUpdate) {
-      days = this.maxDaysPerUpdate;
+    const cap = SPEEDS[this.speed].maxDaysPerUpdate ?? this.maxDaysPerUpdate;
+    if (days > cap) {
+      days = cap;
       this.accumulator = 0; // drop backlog instead of catching up forever
     } else {
       this.accumulator = Math.max(0, this.accumulator - days);

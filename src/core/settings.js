@@ -10,14 +10,33 @@ export const DEFAULT_SETTINGS = {
   newsFilter: 'relevant', // 'relevant' | 'all' | 'own'
   showLabels: true,
   tutorialDone: false,
+  // situations that stop the clock immediately (unchecked: advisors decide automatically)
+  pauseOn: {
+    warDeclared: true,
+    attackOnPlayer: true,
+    allianceCall: true,
+    diplomaticCrisis: true,
+    bankruptcy: true,
+    revolution: true,
+  },
 };
+
+export const PAUSE_REASONS = [
+  { id: 'warDeclared', label: 'Kriegsausbruch', hint: 'Ein Krieg wird irgendwo auf der Welt erklärt (auch durch Sie).' },
+  { id: 'attackOnPlayer', label: 'Angriff auf eigenes Land', hint: 'Ein Staat erklärt Ihnen den Krieg oder tritt einem Krieg gegen Sie bei.' },
+  { id: 'allianceCall', label: 'Bündnisfall', hint: 'Ein Verbündeter wird angegriffen.' },
+  { id: 'diplomaticCrisis', label: 'Wichtige diplomatische Krise', hint: 'Kriegsdrohungen gegen Sie, Friedensschlüsse mit Ihrer Beteiligung.' },
+  { id: 'bankruptcy', label: 'Staatsbankrott', hint: 'Ihr Land, ein Verbündeter oder eine große Volkswirtschaft wird zahlungsunfähig.' },
+  { id: 'revolution', label: 'Revolution', hint: 'Machtwechsel durch Putsch in Ihrem Land, bei Verbündeten oder großen Staaten.' },
+];
 
 export function loadSettings(ls = globalThis.localStorage) {
   try {
     const raw = ls?.getItem(KEY);
-    return { ...DEFAULT_SETTINGS, ...(raw ? JSON.parse(raw) : {}) };
+    const stored = raw ? JSON.parse(raw) : {};
+    return { ...DEFAULT_SETTINGS, ...stored, pauseOn: { ...DEFAULT_SETTINGS.pauseOn, ...(stored.pauseOn ?? {}) } };
   } catch {
-    return { ...DEFAULT_SETTINGS };
+    return { ...DEFAULT_SETTINGS, pauseOn: { ...DEFAULT_SETTINGS.pauseOn } };
   }
 }
 

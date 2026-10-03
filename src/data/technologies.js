@@ -55,6 +55,12 @@ export const TECHNOLOGIES = [
   T('drones', 'military', 1, 'Militärdrohnen', 300, [], [{ stat: 'militaryPower', value: 0.1 }], 'Unbemannte Systeme für Aufklärung und Angriff.'),
   T('cyberDefense', 'military', 2, 'Cyberabwehr', 560, ['drones'], [{ stat: 'militaryPower', value: 0.05 }, { stat: 'stability', value: 2 }], 'Schutz kritischer Infrastruktur.'),
   T('hypersonics', 'military', 3, 'Hyperschallwaffen', 1000, ['cyberDefense'], [{ stat: 'militaryPower', value: 0.15 }], 'Nahezu nicht abfangbare Waffensysteme.'),
+  T('advancedAvionics', 'military', 2, 'Moderne Avionik', 600, ['drones'], [{ stat: 'militaryPower', value: 0.04 }], 'Sensoren und Datenlinks der 4,5. Generation. Schaltet den Jäger Mk II frei.'),
+  T('precisionGuidance', 'military', 2, 'Präzisionslenkung', 550, ['drones'], [{ stat: 'militaryPower', value: 0.05 }], 'Satelliten- und lasergelenkte Munition. Schaltet die Produktion von Präzisionsmunition frei.'),
+  T('armorComposites', 'military', 2, 'Verbundpanzerung', 520, ['drones'], [{ stat: 'militaryPower', value: 0.05 }], 'Bessere Schutzwirkung für gepanzerte Fahrzeuge.'),
+  T('navalAutomation', 'military', 2, 'Marineautomatisierung', 600, ['drones'], [{ stat: 'militaryPower', value: 0.03 }], 'Automatisierte Schiffssysteme senken den Personalbedarf.'),
+  T('stealthAirframes', 'military', 3, 'Tarnkappenzellen', 1100, ['advancedAvionics'], [{ stat: 'militaryPower', value: 0.06 }], 'Radarreduzierte Flugzeugzellen. Schaltet den Advanced Fighter frei.'),
+  T('carrierOperations', 'military', 3, 'Trägerflugbetrieb', 1200, ['navalAutomation'], [{ stat: 'militaryPower', value: 0.03 }], 'Bau und Betrieb von Flugzeugträgern.'),
   T('aiWarfare', 'military', 4, 'KI-gestützte Kriegsführung', 1600, ['hypersonics', 'robotics'], [{ stat: 'militaryPower', value: 0.2 }], 'Autonome Systeme auf dem Gefechtsfeld.'),
 ];
 

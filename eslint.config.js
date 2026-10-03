@@ -9,7 +9,7 @@ export default [
         window: 'readonly', document: 'readonly', console: 'readonly', performance: 'readonly', requestAnimationFrame: 'readonly',
         setTimeout: 'readonly', localStorage: 'readonly', indexedDB: 'readonly', globalThis: 'readonly', Blob: 'readonly', Response: 'readonly',
         CompressionStream: 'readonly', DecompressionStream: 'readonly', URL: 'readonly', ResizeObserver: 'readonly', Path2D: 'readonly',
-        FormData: 'readonly', Event: 'readonly', btoa: 'readonly', atob: 'readonly', Intl: 'readonly', process: 'readonly', fetch: 'readonly',
+        FormData: 'readonly', Event: 'readonly', btoa: 'readonly', atob: 'readonly', Intl: 'readonly', process: 'readonly', fetch: 'readonly', Buffer: 'readonly',
       },
     },
     rules: {

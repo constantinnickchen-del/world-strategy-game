@@ -81,3 +81,18 @@ export const EMBARGOES = [
   ['USA', 'CUB'], ['USA', 'IRN'], ['USA', 'PRK'], ['USA', 'SYR'], ['USA', 'VEN'],
   ['KOR', 'PRK'], ['JPN', 'PRK'], ['ISR', 'IRN'], ['SAU', 'QAT'], ['ARE', 'QAT'],
 ];
+
+/**
+ * Territorial claims around 2020: [claimant, province code or 'territory:XXX', 'core' | 'claim'].
+ * 'core' = considered rightful own territory (strong revanchism), 'claim' = disputed claim.
+ * Claims make wars more legitimate and are a main driver of the war AI.
+ */
+export const TERRITORIAL_CLAIMS = [
+  ['PAK', 'IN-JK', 'core'], ['PAK', 'IN-LA', 'claim'], ['IND', 'PK-JK', 'core'], ['IND', 'PK-GB', 'core'],
+  ['CHN', 'IN-AR', 'claim'], ['CHN', 'IN-LA', 'claim'], ['CHN', 'territory:TWN', 'core'],
+  ['RUS', 'UA-14', 'claim'], ['RUS', 'UA-09', 'claim'],
+  ['JPN', 'RU-SAK', 'claim'], ['VEN', 'GY-CU', 'claim'], ['VEN', 'GY-UT', 'claim'],
+  ['SRB', 'territory:KOS', 'core'], ['MAR', 'territory:SAH', 'claim'], ['ARG', 'territory:FLK', 'claim'],
+  ['KOR', 'territory:PRK', 'core'], ['PRK', 'territory:KOR', 'core'],
+  ['AFG', 'PK-KP', 'claim'], ['BOL', 'CL-AN', 'claim'], ['GTM', 'territory:BLZ', 'claim'],
+];

@@ -10,12 +10,13 @@ import { tradeSystem } from '../systems/trade.js';
 import { updateBudget } from '../systems/economy.js';
 import { technologySystem } from '../systems/technology.js';
 import { nationalInfrastructure } from '../systems/infrastructure.js';
-import { refreshMilitary } from '../systems/military.js';
+import { refreshTerritory } from './territory.js';
 
 export function primeDerivedValues(state) {
   for (const id of state.countryOrder) {
     const c = state.countries[id];
     c.infrastructure = nationalInfrastructure(state, c);
+    refreshTerritory(state, c);
   }
   measureMarket(state);
   for (const rid of RESOURCE_IDS) {
@@ -28,7 +29,6 @@ export function primeDerivedValues(state) {
   technologySystem.monthly(state);
   for (const id of state.countryOrder) {
     const c = state.countries[id];
-    refreshMilitary(c);
     updateBudget(c, { book: false });
     // The starting position defines what is "normal" for this economy.
     c.economy.deficitTarget = (-c.economy.lastRealBalance * 12) / c.economy.gdp;

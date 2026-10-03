@@ -11,14 +11,18 @@ import { GOVERNMENTS } from '../data/governments.js';
 import { RESOURCES, RESOURCE_IDS, basePrice } from '../data/resources.js';
 import { SCENARIOS, DEFAULT_SCENARIO } from '../data/scenarios.js';
 import { TECHNOLOGIES, TECH_BY_ID } from '../data/technologies.js';
-import { BLOCS, OPINION_OVERRIDES, EMBARGOES } from '../data/diplomacySeeds.js';
+import { BLOCS, OPINION_OVERRIDES, EMBARGOES, TERRITORIAL_CLAIMS } from '../data/diplomacySeeds.js';
 import { createRngState, Rng, hashString } from '../core/random.js';
 import { parseISODate, addYears } from '../core/calendar.js';
 import { ensureRelation, setTreaty, setEmbargo, targetOpinion } from '../systems/diplomacy.js';
 import { primeDerivedValues } from './prime.js';
+import { setupMilitary } from './militarySetup.js';
+import { STATIC_REGIONS } from './worldIndex.js';
+import { RESOURCE_HOTSPOTS, TERRAIN_RESOURCE_AFFINITY } from '../data/resourceRegions.js';
+import { SUPPLIERS } from '../data/military/suppliers.js';
 import { statisticsSystem } from '../systems/statistics.js';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 // Defaults by World Bank income group (1 = high income OECD ... 5 = low income)
 const BY_INCOME = {
@@ -52,22 +56,27 @@ const PALETTE = [
 ];
 
 const INITIAL_TECHS = {
-  1: ['eGovernment', 'industry40', 'smartGrid', 'precisionFarming', 'telemedicine', 'eLearning', 'fiveG', 'drones', 'fintech', 'renewables'],
+  1: ['eGovernment', 'industry40', 'smartGrid', 'precisionFarming', 'telemedicine', 'eLearning', 'fiveG', 'drones', 'fintech', 'renewables', 'precisionGuidance', 'advancedAvionics'],
   2: ['eGovernment', 'industry40', 'smartGrid', 'precisionFarming', 'telemedicine', 'fiveG', 'drones'],
   3: ['eGovernment', 'industry40', 'smartGrid', 'precisionFarming', 'telemedicine'],
   4: ['precisionFarming', 'telemedicine'],
   5: [],
 };
 const EXTRA_TECHS = {
-  USA: ['fracking', 'cyberDefense', 'additiveManufacturing', 'genomics', 'highSpeedRail'],
-  CHN: ['fintech', 'renewables', 'cyberDefense', 'drones', 'highSpeedRail', 'fiveG', 'eLearning'],
-  RUS: ['drones', 'cyberDefense', 'hypersonics', 'eLearning'],
-  ISR: ['cyberDefense', 'genomics'],
-  GBR: ['cyberDefense', 'genomics'],
-  FRA: ['cyberDefense', 'highSpeedRail'],
-  JPN: ['highSpeedRail', 'additiveManufacturing'],
-  KOR: ['additiveManufacturing', 'highSpeedRail'],
-  DEU: ['additiveManufacturing', 'storage'],
+  USA: ['fracking', 'cyberDefense', 'additiveManufacturing', 'genomics', 'highSpeedRail', 'stealthAirframes', 'navalAutomation', 'carrierOperations', 'armorComposites'],
+  CHN: ['fintech', 'renewables', 'cyberDefense', 'drones', 'highSpeedRail', 'fiveG', 'eLearning', 'advancedAvionics', 'precisionGuidance', 'stealthAirframes', 'navalAutomation', 'carrierOperations', 'armorComposites'],
+  RUS: ['drones', 'cyberDefense', 'hypersonics', 'eLearning', 'advancedAvionics', 'precisionGuidance', 'stealthAirframes', 'armorComposites', 'navalAutomation', 'carrierOperations'],
+  ISR: ['cyberDefense', 'genomics', 'armorComposites'],
+  GBR: ['cyberDefense', 'genomics', 'navalAutomation', 'carrierOperations', 'armorComposites'],
+  FRA: ['cyberDefense', 'highSpeedRail', 'navalAutomation', 'carrierOperations', 'armorComposites'],
+  ITA: ['navalAutomation', 'carrierOperations'],
+  IND: ['drones', 'advancedAvionics', 'navalAutomation', 'carrierOperations'],
+  JPN: ['highSpeedRail', 'additiveManufacturing', 'navalAutomation'],
+  KOR: ['additiveManufacturing', 'highSpeedRail', 'navalAutomation', 'armorComposites'],
+  TUR: ['drones', 'precisionGuidance'],
+  IRN: ['drones'],
+  PAK: ['drones'],
+  DEU: ['additiveManufacturing', 'storage', 'armorComposites'],
   CAN: ['fracking'],
 };
 
@@ -111,10 +120,13 @@ export function createGameState({ scenarioId = DEFAULT_SCENARIO, playerId = null
     countryOrder: [],
     countries: {},
     regions: {},
-    world: { ownershipVersion: 0, seq: 0 },
+    world: { ownershipVersion: 0, controlVersion: 0, seq: 0 },
     market: {},
     diplomacy: { relations: {} },
     events: { pending: [], cooldowns: {}, log: [] },
+    wars: [],
+    truces: {},
+    procurement: { suppliers: Object.fromEntries(SUPPLIERS.map((sup) => [sup.id, { backlog: 0 }])) },
     news: [],
     stats: { worldGdpHistory: [] },
   };
@@ -126,8 +138,18 @@ export function createGameState({ scenarioId = DEFAULT_SCENARIO, playerId = null
     state.regions[r.id] = {
       id: r.id,
       owner: r.owner,
+      controller: r.owner,
       population: r.population,
       infrastructure: Math.round(infraFromGdpPc(gdppc) * 10) / 10,
+      econ: Math.max(0.0005, r.gdp / 1000), // bn USD of annual output
+      resources: {},
+      buildings: {},
+      siege: null,
+      occupiedSince: null,
+      devastation: 0,
+      unrest: 0,
+      cores: [r.owner],
+      claims: [],
     };
   }
 
@@ -222,7 +244,7 @@ export function createGameState({ scenarioId = DEFAULT_SCENARIO, playerId = null
       resources: {},
       trade: { exports: 0, imports: 0, balance: 0, unmetValue: 0, partners: [] },
       technology: { current: null, progress: {}, researched: [], pointsPerMonth: 0 },
-      military: { equipment: budget.military * gdp * 10, manpower: 0, power: 0 },
+      military: null, // see militarySetup.js
       modifiers: [],
       history: { gdp: [], growth: [], inflation: [], unemployment: [], approval: [], stability: [], debtRatio: [], treasury: [] },
       yearly: { year: [], gdp: [], population: [] },
@@ -237,6 +259,7 @@ export function createGameState({ scenarioId = DEFAULT_SCENARIO, playerId = null
   setupTechnology(state);
   calibrateBudgets(state);
   setupDiplomacy(state);
+  setupMilitary(state);
   primeDerivedValues(state);
   statisticsSystem.monthly(state); // first history sample = scenario start
   return state;
@@ -265,6 +288,7 @@ function setupResources(state) {
       const c = state.countries[id];
       let capacity = (def.producers[id] ?? 0) * scale;
       if (popShare) capacity += popShare * scale * (c.population / totalPop);
+      distributeResource(state, c, rid, capacity);
       c.resources[rid] = {
         capacity: Math.round(capacity * 1000) / 1000,
         demandBase: (weights[id] / weightSum) * 1000,
@@ -282,6 +306,35 @@ function setupResources(state) {
       demand: 1000,
       history: [],
     };
+  }
+}
+
+const FOOD_TERRAIN = { desert: 0.2, arctic: 0.1, urban: 0.4, mountains: 0.5, jungle: 0.7, forest: 0.8, plains: 1.2 };
+const HOTSPOT_SHARE = 0.7;
+
+/** Places a country's resource capacity into its regions (hotspots first, then by area and terrain). */
+function distributeResource(state, c, rid, capacity) {
+  if (capacity <= 0) return;
+  const regions = c.regionIds.map((id) => STATIC_REGIONS[id]);
+  const totalPop = regions.reduce((s, r) => s + r.population, 0) || 1;
+  const totalArea = regions.reduce((s, r) => s + Math.max(1, r.areaKm), 0) || 1;
+  const hot = new Set(RESOURCE_HOTSPOTS[rid] ?? []);
+  const isHot = (r) => r.provinces.some((p) => hot.has(p));
+  const base = (r) => {
+    if (rid === 'food') return (0.5 * (r.population / totalPop) + 0.5 * (Math.max(1, r.areaKm) / totalArea)) * (FOOD_TERRAIN[r.terrain] ?? 1);
+    const jitter = 0.4 + hashString(`${rid}:${r.id}`) / 4294967296; // deterministic geology
+    return Math.sqrt(Math.max(1, r.areaKm)) * (TERRAIN_RESOURCE_AFFINITY[rid]?.[r.terrain] ?? 1) * jitter;
+  };
+  const hotRegions = rid === 'food' ? [] : regions.filter(isHot);
+  const shares = new Map();
+  const baseSum = regions.reduce((s, r) => s + base(r), 0) || 1;
+  const hotShare = hotRegions.length ? HOTSPOT_SHARE : 0;
+  for (const r of regions) shares.set(r.id, (1 - hotShare) * (base(r) / baseSum));
+  const hotBase = hotRegions.reduce((s, r) => s + base(r), 0) || 1;
+  for (const r of hotRegions) shares.set(r.id, shares.get(r.id) + hotShare * (base(r) / hotBase));
+  for (const [id, share] of shares) {
+    const v = capacity * share;
+    if (v > 0.0005) state.regions[id].resources[rid] = Math.round(v * 10000) / 10000;
   }
 }
 
@@ -341,6 +394,18 @@ function setupDiplomacy(state) {
   }
   for (const [a, b] of EMBARGOES) {
     if (exists(a) && exists(b)) setEmbargo(state, a, b, true);
+  }
+  for (const [claimant, where, kind] of TERRITORIAL_CLAIMS) {
+    if (!exists(claimant)) continue;
+    const regionIds = where.startsWith('territory:')
+      ? Object.values(STATIC_REGIONS).filter((r) => r.territory === where.slice(10)).map((r) => r.id)
+      : Object.values(STATIC_REGIONS).filter((r) => r.provinces.includes(where)).map((r) => r.id);
+    for (const rid of regionIds) {
+      const r = state.regions[rid];
+      if (r.owner === claimant) continue;
+      const list = kind === 'core' ? r.cores : r.claims;
+      if (!list.includes(claimant)) list.push(claimant);
+    }
   }
   // Start opinions at their equilibrium (base + treaty bonuses - embargo penalty).
   for (const rel of Object.values(state.diplomacy.relations)) rel.opinion = targetOpinion(rel);

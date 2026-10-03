@@ -11,6 +11,7 @@ import { RESOURCE_IDS } from '../data/resources.js';
 import { getRelation } from './diplomacy.js';
 import { neighborCountryIds } from '../state/worldIndex.js';
 import { getMod } from './modifiers.js';
+import { activeWars } from './war/wars.js';
 
 const PASSES = 2;
 const TOP_PARTNERS = 6;
@@ -49,6 +50,30 @@ export const tradeSystem = {
       const j = index.get(b);
       if (i === undefined || j === undefined) continue;
       relFactor[i * n + j] = relFactor[j * n + i] = relationTradeFactor(rel);
+    }
+    // Wars stop trade between enemies; naval blockades choke the trade of the blockaded country.
+    const blockade = new Float32Array(n);
+    for (const w of activeWars(state)) {
+      for (const a of w.attackers) {
+        for (const d of w.defenders) {
+          const i = index.get(a);
+          const j = index.get(d);
+          if (i !== undefined && j !== undefined) relFactor[i * n + j] = relFactor[j * n + i] = 0;
+        }
+      }
+      for (const [id, b] of Object.entries(w.blockade ?? {})) {
+        const i = index.get(id);
+        if (i !== undefined) blockade[i] = Math.max(blockade[i], b);
+      }
+    }
+    for (let i = 0; i < n; i++) {
+      if (!blockade[i]) continue;
+      const neighbors = new Set(neighborCountryIds(state, countries[i].id));
+      for (let j = 0; j < n; j++) {
+        if (neighbors.has(countries[j].id)) continue; // land routes stay open
+        relFactor[i * n + j] *= 1 - blockade[i];
+        relFactor[j * n + i] *= 1 - blockade[i];
+      }
     }
     const weights = new Float32Array(n * n).fill(-1);
     const weightOf = (i, j) => {

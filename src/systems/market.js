@@ -26,13 +26,18 @@ export function productionOf(c, rid) {
   return r.capacity * Math.max(0, 1 + getMod(c, `output.${rid}`)) * outputFactor(c);
 }
 
+/** Raw material needs of military production (units/year), see systems/military/production.js. */
+function militaryDemand(c, rid) {
+  return c.military?.resourceUse?.[rid] ?? 0;
+}
+
 export function consumptionOf(c, rid, price, basePrice) {
   const r = c.resources[rid];
   const def = RESOURCES[rid].demand;
   const e = c.economy;
   const size = def.gdp * Math.pow(Math.max(0.01, e.gdp / e.gdpRef), 0.8) + def.pop * (c.population / Math.max(1, e.popRef));
   const priceEffect = Math.pow(price / basePrice, -0.12);
-  return r.demandBase * size * Math.max(0.2, 1 + getMod(c, `demand.${rid}`)) * priceEffect;
+  return r.demandBase * size * Math.max(0.2, 1 + getMod(c, `demand.${rid}`)) * priceEffect + militaryDemand(c, rid);
 }
 
 /** Recomputes national production/consumption and world supply/demand (no price change). */
@@ -58,7 +63,7 @@ export function measureMarket(state) {
 export const marketSystem = {
   id: 'market',
   monthly(state) {
-    const countries = measureMarket(state);
+    measureMarket(state);
     for (const rid of RESOURCE_IDS) {
       const m = state.market[rid];
       const ratio = m.demand / Math.max(1, m.supply);
@@ -67,11 +72,12 @@ export const marketSystem = {
       pushSeries(m.history, m.price, PRICE_HISTORY_LENGTH);
 
       // Capacity investment responds to prices (annual rate applied monthly).
+      // Capacity lives in regions, so whoever controls a region controls its output.
       const rel = m.price / m.basePrice;
       const growth = clamp(0.02 + 0.08 * (rel - 1), -0.04, 0.12) / 12;
-      for (const c of countries) {
-        const r = c.resources[rid];
-        if (r.capacity > 0) r.capacity *= 1 + growth;
+      for (const r of Object.values(state.regions)) {
+        const v = r.resources[rid];
+        if (v) r.resources[rid] = v * (1 + growth);
       }
     }
   },

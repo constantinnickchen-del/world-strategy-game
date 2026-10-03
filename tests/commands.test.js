@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { newState, ctxFor } from './helpers.js';
 import { executeCommand, validateCommand, improveRelationsCost } from '../src/commands/commands.js';
 import { getOpinion, hasTreaty, hasEmbargo, evaluateProposal } from '../src/systems/diplomacy.js';
-import { fireEvent } from '../src/systems/events.js';
+import { fireEvent, optionUnavailable } from '../src/systems/events.js';
 import { EVENTS } from '../src/data/events.js';
 
 const run = (s, cmd) => executeCommand(s, { countryId: 'DEU', ...cmd }, ctxFor(s));
@@ -102,7 +102,9 @@ test('every event definition can fire and resolve every option', () => {
       if (def.scope !== 'world') {
         const p = fireEvent(s, def.id, 'DEU', { otherId: 'FRA', data: { treaty: 'nonAggression' } }, ctx);
         assert.ok(s.events.pending.includes(p));
-        assert.equal(run(s, { type: 'resolveEvent', uid: p.uid, option: opt }).ok, true, `${def.id} option ${opt}`);
+        // options with an availability rule (crisis events without a matching war) must be refused cleanly
+        const expected = !optionUnavailable(s, p, opt);
+        assert.equal(run(s, { type: 'resolveEvent', uid: p.uid, option: opt }).ok, expected, `${def.id} option ${opt}`);
       }
       let bad = 0;
       JSON.stringify(s, (k, v) => (typeof v === 'number' && !Number.isFinite(v) ? bad++ : v));

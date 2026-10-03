@@ -85,3 +85,22 @@ test('validation rejects broken states', () => {
   delete s.countries.DEU;
   assert.throws(() => validateState(s), /DEU/);
 });
+
+test('a real schema-1 save (before regions and armed forces) migrates and keeps running', async () => {
+  const { gunzipSync } = await import('node:zlib');
+  const { readFileSync } = await import('node:fs');
+  const old = JSON.parse(gunzipSync(readFileSync(new URL('./fixtures/save-v1.json.gz', import.meta.url))).toString());
+  assert.equal(old.meta.schemaVersion, 1);
+  const day = old.time.day;
+  const gdp = old.countries.DEU.economy.gdp;
+  const s = migrateState(old);
+  assert.equal(s.meta.schemaVersion, 2);
+  assert.equal(s.time.day, day, 'date kept');
+  assert.ok(Math.abs(s.countries.DEU.economy.gdp / gdp - 1) < 0.02, 'GDP kept');
+  assert.ok(s.countries.DEU.military.units.length > 0, 'armed forces exist');
+  assert.equal(validateState(s), true);
+  new Simulation().advanceDays(s, 60);
+  let bad = 0;
+  JSON.stringify(s, (k, v) => (typeof v === 'number' && !Number.isFinite(v) ? bad++ : v));
+  assert.equal(bad, 0);
+});

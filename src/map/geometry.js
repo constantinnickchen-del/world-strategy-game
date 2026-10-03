@@ -1,11 +1,16 @@
 /**
- * Map geometry: decoding, projection and hit testing. No DOM access, so it is
- * unit-testable in Node.
+ * Map geometry: decoding of the topology, projection and hit testing. No DOM
+ * access, so it is unit-testable in Node.
  *
  * Projection: Miller cylindrical. World coordinates: x = longitude (-180..180),
  * y = -millerY(latitude) in degree-like units (north is up / negative y).
+ *
+ * Topology: borders are stored once as shared arcs with the regions on both
+ * sides. Region outlines are assembled from arcs, and the renderer classifies
+ * every arc at draw time (country border, internal region border, front line,
+ * coast) from the *current* ownership – borders move when territory changes.
  */
-import { RINGS, QUANT } from '../data/generated/geometry.js';
+import { ARCS, ARC_SIDES, REGION_RINGS, REGION_ORDER, QUANT } from '../data/generated/geometry.js';
 
 export const LAT_MIN = -58;
 export const LAT_MAX = 84;
@@ -22,8 +27,8 @@ export function project(lon, lat) {
 
 export const WORLD_BOUNDS = { minX: -180, maxX: 180, minY: projectLat(LAT_MAX), maxY: projectLat(LAT_MIN) };
 
-/** Decodes a delta-encoded integer ring into projected Float32 coordinates [x0,y0,x1,y1,...]. */
-export function decodeRing(encoded) {
+/** Decodes a delta-encoded arc into projected Float32 coordinates [x0,y0,x1,y1,...]. */
+export function decodeArc(encoded) {
   const out = new Float32Array(encoded.length);
   let x = 0;
   let y = 0;
@@ -36,11 +41,35 @@ export function decodeRing(encoded) {
   return out;
 }
 
-/** @returns {Map<string, {rings: Float32Array[], bbox: number[]}>} */
-export function buildRegionGeometry(source = RINGS) {
-  const map = new Map();
-  for (const [id, rings] of Object.entries(source)) {
-    const decoded = rings.map(decodeRing);
+/** Concatenates arcs (negative index = reversed) into one closed ring. */
+function assembleRing(refs, arcs) {
+  let len = 0;
+  for (const r of refs) len += arcs[r < 0 ? ~r : r].length;
+  const out = new Float32Array(len);
+  let o = 0;
+  for (const r of refs) {
+    const a = arcs[r < 0 ? ~r : r];
+    const n = a.length / 2;
+    for (let i = 0; i < n; i++) {
+      const j = r < 0 ? n - 1 - i : i;
+      // skip the duplicated joint point between consecutive arcs
+      if (o >= 2 && i === 0) continue;
+      out[o++] = a[j * 2];
+      out[o++] = a[j * 2 + 1];
+    }
+  }
+  return out.subarray(0, o);
+}
+
+/**
+ * @returns {{arcs: Float32Array[], arcSides: [string, string|null][], regions: Map<string, {rings: Float32Array[], bbox: number[]}>}}
+ */
+export function buildTopology() {
+  const arcs = ARCS.map(decodeArc);
+  const arcSides = ARC_SIDES.map(([l, r]) => [REGION_ORDER[l], r >= 0 ? REGION_ORDER[r] : null]);
+  const regions = new Map();
+  for (const [id, rings] of Object.entries(REGION_RINGS)) {
+    const decoded = rings.map((refs) => assembleRing(refs, arcs));
     const bbox = [Infinity, Infinity, -Infinity, -Infinity];
     for (const r of decoded) {
       for (let i = 0; i < r.length; i += 2) {
@@ -50,9 +79,14 @@ export function buildRegionGeometry(source = RINGS) {
         if (r[i + 1] > bbox[3]) bbox[3] = r[i + 1];
       }
     }
-    map.set(id, { rings: decoded, bbox });
+    regions.set(id, { rings: decoded, bbox });
   }
-  return map;
+  return { arcs, arcSides, regions };
+}
+
+/** Backwards compatible helper: region geometry only. */
+export function buildRegionGeometry() {
+  return buildTopology().regions;
 }
 
 /** Even-odd point in polygon over all rings (holes are separate rings). */

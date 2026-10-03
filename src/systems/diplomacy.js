@@ -77,6 +77,7 @@ export function hasTreaty(state, a, b, treaty) {
 export function setTreaty(state, a, b, treaty, active) {
   if (!(treaty in TREATIES)) throw new Error(`Unknown treaty ${treaty}`);
   const rel = ensureRelation(state, a, b);
+  state.diplomacy.version = (state.diplomacy.version ?? 0) + 1;
   if (active) {
     rel.treaties[treaty] = state.time.day;
     if (treaty === 'alliance') rel.treaties.nonAggression ??= state.time.day;
@@ -114,10 +115,27 @@ export function treatiesOf(state, countryId) {
   return out;
 }
 
+const allianceCache = new WeakMap();
+
+/** Alliance partners (cached; invalidated whenever a treaty changes). */
 export function alliesOf(state, countryId) {
-  return treatiesOf(state, countryId)
-    .filter((t) => t.treaty === 'alliance')
-    .map((t) => t.other);
+  let entry = allianceCache.get(state);
+  const version = state.diplomacy.version ?? 0;
+  if (!entry || entry.version !== version) {
+    const map = new Map();
+    for (const [key, rel] of Object.entries(state.diplomacy.relations)) {
+      if (!rel.treaties.alliance) continue;
+      const [a, b] = key.split('|');
+      if (!map.has(a)) map.set(a, []);
+      if (!map.has(b)) map.set(b, []);
+      map.get(a).push(b);
+      map.get(b).push(a);
+    }
+    for (const list of map.values()) list.sort();
+    entry = { version, map };
+    allianceCache.set(state, entry);
+  }
+  return entry.map.get(countryId) ?? [];
 }
 
 /**

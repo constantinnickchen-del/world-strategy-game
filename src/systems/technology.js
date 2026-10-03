@@ -18,6 +18,12 @@ export function researchPointsPerMonth(c) {
   return 15 * spending * dev * size * stability * Math.max(0.1, 1 + getMod(c, 'researchSpeed'));
 }
 
+/** Research focus 0 (civilian) .. 1 (military): speeds up one kind of research at the cost of the other. */
+export function focusMultiplier(c, techId) {
+  const focus = c.technology.focus ?? 0.5;
+  return TECH_BY_ID[techId]?.category === 'military' ? 0.6 + 0.8 * focus : 1.4 - 0.8 * focus;
+}
+
 export function isResearched(c, techId) {
   return c.technology.researched.includes(techId);
 }
@@ -79,7 +85,7 @@ export const technologySystem = {
         c.technology.current = null;
         continue;
       }
-      c.technology.progress[cur] = (c.technology.progress[cur] ?? 0) + pts;
+      c.technology.progress[cur] = (c.technology.progress[cur] ?? 0) + pts * focusMultiplier(c, cur);
       if (c.technology.progress[cur] >= techCost(state, cur)) completeTech(state, c, cur);
     }
   },

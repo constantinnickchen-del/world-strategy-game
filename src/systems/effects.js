@@ -9,7 +9,10 @@
 import { RESOURCES, RESOURCE_IDS } from '../data/resources.js';
 import { IDEOLOGIES } from '../data/governments.js';
 import { addModifier, formatModValue, isPositiveMod, STATS } from './modifiers.js';
-import { changeOpinion, setTreaty, TREATIES } from './diplomacy.js';
+import { changeOpinion, setTreaty, setEmbargo, TREATIES } from './diplomacy.js';
+import { setMobilization } from './military/manpower.js';
+import { MOBILIZATION_LEVELS } from '../data/military/army.js';
+import { joinWar, concludePeace, evaluatePeace, sideOf } from './war/wars.js';
 import { BUDGET_IDS, BUDGET_CATEGORIES } from '../state/selectors.js';
 import { techCost } from './technology.js';
 import { addNews } from './news.js';
@@ -45,7 +48,13 @@ function addTreasury(country, amount) {
  * @param {object[]} effects     resolved effects
  * @param {{otherId?:string|null, label?:string}} ctx
  */
-export function applyEffects(state, country, effects, { otherId = null, label = '' } = {}) {
+/** Resolves an effect target: 'other' or a key of the event data (e.g. 'attacker'). */
+function targetId(eff, otherId, data) {
+  if (!eff.target || eff.target === 'other') return otherId;
+  return data?.[eff.target] ?? null;
+}
+
+export function applyEffects(state, country, effects, { otherId = null, label = '', data = {}, ctx = null } = {}) {
   for (const eff of effects) {
     switch (eff.type) {
       case 'treasury':
@@ -61,8 +70,14 @@ export function applyEffects(state, country, effects, { otherId = null, label = 
         addModifier(state, country, { stat: eff.stat, value: eff.value, months: eff.months, label: eff.label ?? label, source: 'event' });
         break;
       case 'capacity': {
-        const r = country.resources[eff.resource];
-        r.capacity = r.capacity > 0 ? r.capacity * (1 + eff.factor) : eff.factor * 10;
+        // capacity lives in regions: grow existing deposits, or open one in the largest region
+        const regions = country.regionIds.map((id) => state.regions[id]).filter((r) => r.resources[eff.resource]);
+        if (regions.length) for (const r of regions) r.resources[eff.resource] *= 1 + eff.factor;
+        else {
+          const biggest = country.regionIds.map((id) => state.regions[id]).sort((a, b) => b.econ - a.econ)[0];
+          if (biggest) biggest.resources[eff.resource] = eff.factor * 10;
+        }
+        country.resources[eff.resource].capacity *= 1 + eff.factor;
         break;
       }
       case 'infrastructure':
@@ -98,8 +113,53 @@ export function applyEffects(state, country, effects, { otherId = null, label = 
         }
         break;
       case 'militaryEquipment':
-        country.military.equipment = Math.max(0, country.military.equipment * (1 + eff.share));
+        for (const u of country.military.units) u.equip = clamp(u.equip * (1 + eff.share), 0, 1);
         break;
+      case 'mobilize':
+        if (country.military.mobilization < eff.level) setMobilization(state, country, eff.level);
+        break;
+      case 'opinionWith': {
+        const t = targetId(eff, otherId, data);
+        if (t) changeOpinion(state, country.id, t, eff.value);
+        break;
+      }
+      case 'embargoTarget': {
+        const t = targetId(eff, otherId, data);
+        if (t) {
+          setEmbargo(state, country.id, t, true);
+          setTreaty(state, country.id, t, 'trade', false);
+          changeOpinion(state, country.id, t, -15);
+          addNews(state, { category: 'diplomacy', countryId: country.id, others: [t], importance: 2, text: `${country.name} verhängt Sanktionen gegen ${state.countries[t].name}.` });
+        }
+        break;
+      }
+      case 'breakAlliance': {
+        const t = targetId(eff, otherId, data);
+        if (t) {
+          setTreaty(state, country.id, t, 'alliance', false);
+          changeOpinion(state, country.id, t, -40);
+          addNews(state, { category: 'diplomacy', countryId: country.id, others: [t], importance: 2, text: `${country.name} verweigert ${state.countries[t].name} den Beistand – das Bündnis zerbricht.` });
+        }
+        break;
+      }
+      case 'joinWar': {
+        const war = state.wars.find((w) => w.id === data.warId && w.status === 'active');
+        if (war && !sideOf(war, country.id)) joinWar(state, war, country.id, eff.side, ctx);
+        break;
+      }
+      case 'acceptPeace': {
+        const war = state.wars.find((w) => w.id === data.warId && w.status === 'active');
+        if (war) concludePeace(state, war, data.side, data.terms, ctx);
+        break;
+      }
+      case 'offerWhitePeace': {
+        const war = state.wars.find((w) => w.id === data.warId && w.status === 'active');
+        if (!war) break;
+        const side = sideOf(war, country.id);
+        if (evaluatePeace(state, war, side, { whitePeace: true }).accept) concludePeace(state, war, side, { whitePeace: true }, ctx);
+        else addNews(state, { category: 'diplomacy', countryId: country.id, importance: 2, text: `${state.countries[war[side === 'attackers' ? 'defenders' : 'attackers'][0]].name} lehnt einen Waffenstillstand ab.` });
+        break;
+      }
       case 'governmentChange':
         country.politics.ideology = eff.ideology;
         if (eff.ideology === 'military') {
@@ -112,6 +172,7 @@ export function applyEffects(state, country, effects, { otherId = null, label = 
           importance: 2,
           text: `Machtwechsel in ${country.name}: Neue Führung (${IDEOLOGIES[eff.ideology].name}).`,
         });
+        ctx?.bus?.emit('interrupt', { kind: 'revolution', countryId: country.id });
         break;
       case 'modifierAll':
         for (const id of state.countryOrder) {
@@ -138,7 +199,7 @@ function matchesFilter(state, c, filter) {
 }
 
 /** Human readable description: [{text, positive}] */
-export function describeEffects(state, country, effects, { otherId = null } = {}) {
+export function describeEffects(state, country, effects, { otherId = null, data = {} } = {}) {
   const other = otherId ? state.countries[otherId]?.name : '';
   const out = [];
   for (const eff of effects) {
@@ -177,6 +238,27 @@ export function describeEffects(state, country, effects, { otherId = null } = {}
         break;
       case 'budgetCut':
         out.push({ text: `Zivile Ausgaben −${Math.round(eff.share * 100)} %`, positive: false });
+        break;
+      case 'mobilize':
+        out.push({ text: `${MOBILIZATION_LEVELS[eff.level].name} anordnen`, positive: true });
+        break;
+      case 'opinionWith':
+        out.push({ text: `Beziehung zu ${state.countries[targetId(eff, otherId, data)]?.name ?? '?'} ${eff.value > 0 ? '+' : ''}${eff.value}`, positive: eff.value > 0 });
+        break;
+      case 'embargoTarget':
+        out.push({ text: `Handelsembargo gegen ${state.countries[targetId(eff, otherId, data)]?.name ?? '?'}`, positive: false });
+        break;
+      case 'breakAlliance':
+        out.push({ text: `Bündnis mit ${state.countries[targetId(eff, otherId, data)]?.name ?? '?'} endet`, positive: false });
+        break;
+      case 'joinWar':
+        out.push({ text: `Kriegseintritt auf Seite von ${state.countries[eff.side === 'defenders' ? data.defender : data.attacker]?.name ?? '?'}`, positive: false });
+        break;
+      case 'acceptPeace':
+        out.push({ text: data.termsText ? `Frieden: ${data.termsText}` : 'Frieden schließen', positive: true });
+        break;
+      case 'offerWhitePeace':
+        out.push({ text: 'Waffenstillstand zu Vorkriegsgrenzen anbieten', positive: true });
         break;
       case 'militaryEquipment':
         out.push({ text: `Militärausrüstung ${eff.share > 0 ? '+' : ''}${Math.round(eff.share * 100)} %`, positive: eff.share > 0 });

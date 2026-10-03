@@ -24,6 +24,7 @@ export function approvalFactors(c) {
     ['Steuerlast (Änderung)', -clamp(80 * (e.taxRate - p.taxTolerance), -10, 20) * sens],
     ['Sozialausgaben (Änderung)', clamp(120 * (c.budget.welfare - p.welfareBaseline), -15, 10) * sens],
     ['Versorgungsengpässe', -clamp(300 * (c.trade.unmetValue / Math.max(0.01, e.gdp)), 0, 15)],
+    ['Krieg & Mobilmachung', militaryApproval(c)],
     ['Modifikatoren', getMod(c, 'approval')],
   ];
   return f.map(([label, value]) => ({ label, value }));
@@ -39,12 +40,24 @@ export function stabilityFactors(c) {
     ['Massenarbeitslosigkeit', -clamp(60 * Math.max(0, e.unemployment - 0.12), 0, 15)],
     ['Sicherheitsapparat', p.government === 'democracy' ? 0 : clamp(150 * (c.budget.military - 0.02), -5, 8)],
     ['Wohlstand', clamp((c.income <= 2 ? 8 : c.income === 3 ? 3 : 0), 0, 8)],
+    ['Kriegsmüdigkeit', -18 * (c.military?.exhaustion ?? 0)],
+    ['Besetzte Gebiete', -clamp(40 * occupiedShare(c), 0, 25)],
     ['Modifikatoren', getMod(c, 'stability')],
   ];
   return f.map(([label, value]) => ({ label, value }));
 }
 
 const sum = (factors) => factors.reduce((s, f) => s + f.value, 0);
+
+function militaryApproval(c) {
+  const m = c.military;
+  if (!m) return 0;
+  return (m.atWar ? 0 : -4 * m.mobilization) - 25 * m.exhaustion;
+}
+
+function occupiedShare(c) {
+  return c.occupiedShare ?? 0;
+}
 
 function holdElection(state, c, ctx) {
   const p = c.politics;

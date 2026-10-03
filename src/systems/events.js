@@ -25,7 +25,10 @@ export function eventText(state, instance) {
   return def.text
     .replaceAll('{country}', c?.name ?? 'der Welt')
     .replaceAll('{other}', o?.name ?? '')
-    .replaceAll('{treaty}', instance.data?.treaty ? TREATIES[instance.data.treaty].name : '');
+    .replaceAll('{treaty}', instance.data?.treaty ? TREATIES[instance.data.treaty].name : '')
+    .replaceAll('{attacker}', state.countries[instance.data?.attacker]?.name ?? '')
+    .replaceAll('{defender}', state.countries[instance.data?.defender]?.name ?? '')
+    .replaceAll('{terms}', instance.data?.termsText ?? '');
 }
 
 function cooldownKey(scopeId, eventId) {
@@ -64,15 +67,28 @@ export function fireEvent(state, eventId, countryId, { otherId = null, data = {}
     state.events.pending.push(instance);
     ctx.bus?.emit('event:pending', instance);
   } else {
-    const idx = aiChooseOption(def, ctx);
+    const idx = aiChooseOption(def, ctx, state, instance);
     resolveInstance(state, instance, idx, ctx);
   }
   return instance;
 }
 
-function aiChooseOption(def, ctx) {
-  const indices = def.options.map((_, i) => i);
-  return ctx.rng.weighted(indices, (i) => def.options[i].ai ?? 1) ?? 0;
+/** Why an option cannot be chosen right now (null = available). */
+export function optionUnavailable(state, instance, index) {
+  const def = EVENT_BY_ID[instance.eventId];
+  const opt = def.options[index];
+  if (!opt?.available) return null;
+  return opt.available(state, state.countries[instance.countryId], instance) ?? null;
+}
+
+/** The option an advisor (or an AI government) picks for an event instance. */
+export function advisorChoice(state, instance, ctx) {
+  return aiChooseOption(EVENT_BY_ID[instance.eventId], ctx, state, instance);
+}
+
+function aiChooseOption(def, ctx, state = null, instance = null) {
+  const indices = def.options.map((_, i) => i).filter((i) => !state || !instance || !optionUnavailable(state, instance, i));
+  return ctx.rng.weighted(indices, (i) => def.options[i].ai ?? 1) ?? indices[0] ?? 0;
 }
 
 /** Applies an option of an event instance. Works for player and AI. */
@@ -81,7 +97,7 @@ export function resolveInstance(state, instance, optionIndex, ctx) {
   const option = instance.options[optionIndex];
   if (!option) throw new Error(`Invalid option ${optionIndex} for ${instance.eventId}`);
   const country = instance.countryId ? state.countries[instance.countryId] : null;
-  applyEffects(state, country, option.effects, { otherId: instance.otherId, label: def.title });
+  applyEffects(state, country, option.effects, { otherId: instance.otherId, label: def.title, data: instance.data, ctx });
   state.events.pending = state.events.pending.filter((p) => p.uid !== instance.uid);
   state.events.log.push({ eventId: instance.eventId, countryId: instance.countryId, otherId: instance.otherId, day: state.time.day, option: optionIndex });
   if (state.events.log.length > EVENT_LOG_LIMIT) state.events.log.splice(0, state.events.log.length - EVENT_LOG_LIMIT);
@@ -129,7 +145,7 @@ export const eventsSystem = {
     }
     // Unanswered player events are eventually decided by the advisors.
     for (const inst of [...state.events.pending]) {
-      if (state.time.day - inst.day >= PLAYER_EVENT_TIMEOUT_DAYS) resolveInstance(state, inst, aiChooseOption(EVENT_BY_ID[inst.eventId], ctx), ctx);
+      if (state.time.day - inst.day >= PLAYER_EVENT_TIMEOUT_DAYS) resolveInstance(state, inst, aiChooseOption(EVENT_BY_ID[inst.eventId], ctx, state, inst), ctx);
     }
   },
   monthly(state, ctx) {

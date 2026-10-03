@@ -15,7 +15,9 @@ import {
   TREATIES, IMPROVE_RELATIONS, ensureRelation, getRelation, hasTreaty, setTreaty, hasEmbargo, setEmbargo,
   changeOpinion, evaluateProposal, tradeBlocked,
 } from '../systems/diplomacy.js';
-import { fireEvent, resolveInstance } from '../systems/events.js';
+import { fireEvent, resolveInstance, optionUnavailable } from '../systems/events.js';
+import { MILITARY_COMMANDS } from './militaryCommands.js';
+import { areEnemies } from '../systems/war/wars.js';
 import { addNews } from '../systems/news.js';
 import { formatBn } from '../util/format.js';
 
@@ -117,6 +119,7 @@ export const COMMANDS = {
       if (!TREATIES[cmd.treaty]) return 'Unbekannter Vertrag.';
       if (hasTreaty(state, cmd.countryId, cmd.targetId, cmd.treaty)) return 'Vertrag besteht bereits.';
       if (tradeBlocked(state, cmd.countryId, cmd.targetId)) return 'Zuerst muss das Embargo aufgehoben werden.';
+      if (areEnemies(state, cmd.countryId, cmd.targetId)) return 'Mitten im Krieg nicht möglich – zuerst Frieden schließen.';
       if (cmd.targetId === state.playerId && state.events.pending.some((p) => p.eventId === 'treatyProposal' && p.otherId === cmd.countryId)) {
         return 'Es liegt bereits ein Vorschlag vor.';
       }
@@ -210,7 +213,7 @@ export const COMMANDS = {
       const inst = state.events.pending.find((p) => p.uid === uid);
       if (!inst || inst.countryId !== countryId) return 'Ereignis nicht gefunden.';
       if (!inst.options[option]) return 'Ungültige Option.';
-      return null;
+      return optionUnavailable(state, inst, option);
     },
     execute(state, { uid, option }, ctx) {
       const inst = state.events.pending.find((p) => p.uid === uid);
@@ -218,6 +221,8 @@ export const COMMANDS = {
     },
   },
 };
+
+Object.assign(COMMANDS, MILITARY_COMMANDS);
 
 export function validateCommand(state, cmd) {
   const def = COMMANDS[cmd?.type];

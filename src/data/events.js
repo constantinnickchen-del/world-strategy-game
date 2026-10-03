@@ -16,6 +16,7 @@
 import { gdpPerCapita, debtRatio } from '../state/selectors.js';
 import { neighborCountryIds } from '../state/worldIndex.js';
 import { getOpinion, hasTreaty } from '../systems/diplomacy.js';
+import { warById, canJoinWarSide } from '../systems/war/queries.js';
 
 export const EVENTS = [
   {
@@ -216,6 +217,77 @@ export const EVENTS = [
     options: [
       { label: 'Vorschlag annehmen', effects: [{ type: 'treaty', target: 'other', treaty: '$treaty' }, { type: 'opinion', target: 'other', value: 5 }], ai: 1 },
       { label: 'Ablehnen', effects: [{ type: 'opinion', target: 'other', value: -6 }], ai: 1 },
+    ],
+  },
+  // ----- War & crisis events (fired by the war system) -----
+  {
+    id: 'warCrisis',
+    scope: 'triggered',
+    crisis: true,
+    title: '⚠ Internationale Krise',
+    text: '{attacker} hat {defender} den Krieg erklärt. Die Welt blickt auf die Reaktion von {country}.',
+    options: [
+      { label: 'Neutral bleiben und die Lage analysieren', effects: [], ai: 3 },
+      { label: 'Den Angriff öffentlich verurteilen', effects: [{ type: 'opinionWith', target: 'attacker', value: -15 }, { type: 'opinionWith', target: 'defender', value: 10 }], ai: 2 },
+      { label: 'Wirtschaftssanktionen gegen den Angreifer', effects: [{ type: 'embargoTarget', target: 'attacker' }, { type: 'opinionWith', target: 'defender', value: 15 }], ai: 1 },
+      { label: 'Truppen in Bereitschaft versetzen', effects: [{ type: 'mobilize', level: 1 }], ai: 1 },
+      {
+        label: 'An der Seite des Angegriffenen in den Krieg eintreten',
+        effects: [{ type: 'joinWar', side: 'defenders' }, { type: 'mobilize', level: 1 }],
+        ai: 0,
+        available: (state, c, inst) => canJoinWarSide(state, c.id, warById(state, inst.data.warId), 'defenders'),
+      },
+    ],
+  },
+  {
+    id: 'warAttackOnPlayer',
+    scope: 'triggered',
+    crisis: true,
+    title: '⚠ Angriff auf {country}!',
+    text: '{attacker} hat {country} den Krieg erklärt! Die Streitkräfte erwarten Ihre Befehle. Der Generalstab hat die Verteidigung bereits aufgenommen.',
+    options: [
+      { label: 'Generalmobilmachung – alle Reserven einberufen', effects: [{ type: 'mobilize', level: 2 }, { type: 'approval', value: 6 }], ai: 2 },
+      { label: 'Teilmobilmachung anordnen', effects: [{ type: 'mobilize', level: 1 }, { type: 'approval', value: 4 }], ai: 1 },
+      { label: 'Sofort einen Waffenstillstand anbieten', effects: [{ type: 'offerWhitePeace' }, { type: 'approval', value: -4 }], ai: 0 },
+    ],
+  },
+  {
+    id: 'warAllianceCall',
+    scope: 'triggered',
+    crisis: true,
+    title: '⚠ Bündnisfall',
+    text: '{attacker} hat Ihren Verbündeten {defender} angegriffen. {defender} beruft sich auf das Bündnis und bittet {country} um militärischen Beistand.',
+    options: [
+      {
+        label: 'Bündnispflicht erfüllen – in den Krieg eintreten',
+        effects: [{ type: 'joinWar', side: 'defenders' }, { type: 'mobilize', level: 1 }, { type: 'opinionWith', target: 'defender', value: 15 }],
+        ai: 2,
+        available: (state, c, inst) => canJoinWarSide(state, c.id, warById(state, inst.data.warId), 'defenders'),
+      },
+      { label: 'Neutral bleiben (das Bündnis zerbricht)', effects: [{ type: 'breakAlliance', target: 'defender' }], ai: 1 },
+    ],
+  },
+  {
+    id: 'warPeaceOffer',
+    scope: 'triggered',
+    crisis: true,
+    title: 'Friedensangebot',
+    text: '{other} bietet {country} Frieden an. Bedingungen: {terms}',
+    options: [
+      { label: 'Frieden annehmen', effects: [{ type: 'acceptPeace' }], ai: 1, available: (state, c, inst) => (warById(state, inst.data.warId) ? null : 'Der Krieg ist bereits beendet.') },
+      { label: 'Ablehnen und weiterkämpfen', effects: [{ type: 'opinionWith', target: 'other', value: -5 }], ai: 1 },
+    ],
+  },
+  {
+    id: 'warTension',
+    scope: 'triggered',
+    crisis: true,
+    title: '⚠ Hohe Spannungen',
+    text: 'Die Beziehungen zu {other} haben sich stark verschlechtert. Militärische Aktivitäten an der Grenze nehmen zu – {other} bereitet möglicherweise einen Angriff vor.',
+    options: [
+      { label: 'Teilmobilmachung anordnen', effects: [{ type: 'mobilize', level: 1 }], ai: 1 },
+      { label: 'Diplomatische Deeskalation (Kosten 0,1 % des BIP)', effects: [{ type: 'treasury', gdpShare: -0.001 }, { type: 'opinion', target: 'other', value: 15 }], ai: 1 },
+      { label: 'Lage weiter beobachten', effects: [], ai: 1 },
     ],
   },
   // ----- World events -----

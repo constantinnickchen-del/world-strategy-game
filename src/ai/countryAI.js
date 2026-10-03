@@ -15,6 +15,9 @@ import { availableTechs, techCost } from '../systems/technology.js';
 import { getOpinion, hasTreaty, hasEmbargo, getRelation, tradeBlocked } from '../systems/diplomacy.js';
 import { neighborCountryIds } from '../state/worldIndex.js';
 import { clamp } from '../util/math.js';
+import { militaryAdvisor, threatLevel } from './militaryAI.js';
+import { warAdvisor } from './warAI.js';
+import { areEnemies } from '../systems/war/wars.js';
 
 const STEP = 0.005;
 const PROPOSAL_COOLDOWN_DAYS = 365;
@@ -65,7 +68,14 @@ export function budgetAdvisor(state, c, ctx) {
   const base = c.ai.baseline ?? c.budget;
   const pers = c.ai.personality;
   const tight = (-c.economy.lastRealBalance * 12) / c.economy.gdp > Math.max(0.03, c.economy.deficitTarget + 0.02);
-  nudgeBudget(state, ctx, c, 'military', base.military * (0.85 + 0.4 * pers.militarism) * (tight ? 0.9 : 1));
+  // security needs raise the defence budget (threat 0..3)
+  const threat = threatLevel(state, c);
+  const security = 1 + Math.min(0.8, threat * 0.25) + (c.military.atWar ? 0.5 : 0);
+  // budgets that the armed forces cannot use are reduced again
+  const sp = c.military.spending;
+  const utilisation = sp?.budget > 0 ? sp.total / sp.budget : 1;
+  const unused = utilisation < 0.75 && threat < 1 && !c.military.atWar ? 0.85 : 1;
+  nudgeBudget(state, ctx, c, 'military', base.military * (0.85 + 0.4 * pers.militarism) * security * unused * (tight && !c.military.atWar ? 0.9 : 1));
   nudgeBudget(state, ctx, c, 'research', base.research * (0.85 + 0.5 * pers.research) * (tight ? 0.9 : 1), 0.001);
   const infraTarget = c.infrastructure < 55 ? Math.max(base.infrastructure, 0.04) : base.infrastructure;
   nudgeBudget(state, ctx, c, 'infrastructure', infraTarget * (tight ? 0.9 : 1));
@@ -115,7 +125,7 @@ export function diplomacyAdvisor(state, c, ctx) {
     cmd(state, ctx, c, 'setEmbargo', { targetId: other, active: true });
     return;
   }
-  if (tradeBlocked(state, c.id, other) || recentlyProposed(state, c.id, other)) return;
+  if (tradeBlocked(state, c.id, other) || recentlyProposed(state, c.id, other) || areEnemies(state, c.id, other)) return;
   if (other === state.playerId && !ctx.rng.chance(PLAYER_PROPOSAL_CHANCE)) return;
   if (!hasTreaty(state, c.id, other, 'trade') && opinion > 10) {
     cmd(state, ctx, c, 'proposeTreaty', { targetId: other, treaty: 'trade' });
@@ -128,7 +138,7 @@ export function diplomacyAdvisor(state, c, ctx) {
   }
 }
 
-export const ADVISORS = [fiscalAdvisor, budgetAdvisor, researchAdvisor, diplomacyAdvisor];
+export const ADVISORS = [fiscalAdvisor, budgetAdvisor, researchAdvisor, diplomacyAdvisor, militaryAdvisor, warAdvisor];
 
 export function runCountryAI(state, c, ctx) {
   for (const advisor of ADVISORS) advisor(state, c, ctx);
