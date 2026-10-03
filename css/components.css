@@ -2676,3 +2676,7 @@ body.is-setup #assistant {
   color: var(--good);
   font-size: 12.5px;
 }
+
+.data-table tr.is-bottleneck td {
+  background: rgba(208, 101, 74, 0.08);
+}

@@ -244,3 +244,40 @@ export function sideSummary(state, ids) {
   }
   return total;
 }
+
+/**
+ * Equipment situation per durable item: what the formations still need, what
+ * is in the depots, what is ordered (production lines + contracts) and what is
+ * really missing after that. Formations are only refitted as far as all of
+ * their items are available, so the item with the largest gap is the bottleneck.
+ */
+export function equipmentStatus(c) {
+  const m = c.military;
+  const need = {};
+  for (const u of m.units) {
+    if (u.status === 'reserve') continue;
+    const missing = Math.max(0, 1 - u.equip) * u.strength;
+    for (const [k, v] of Object.entries(UNIT_TYPES[u.type].equipment)) need[k] = (need[k] ?? 0) + v * missing;
+  }
+  const incoming = {};
+  for (const l of m.production) if (l.kind === 'equipment') incoming[l.item] = (incoming[l.item] ?? 0) + l.quantity - l.done;
+  for (const ct of m.contracts) if (ct.kind === 'equipment' && ct.status !== 'completed') incoming[ct.item] = (incoming[ct.item] ?? 0) + ct.quantity - ct.delivered;
+  const out = {};
+  let bottleneck = null;
+  for (const id of Object.keys(need)) {
+    const n = Math.round(need[id]);
+    if (n <= 0) continue;
+    const stock = Math.round(m.stock[id] ?? 0);
+    const inc = Math.round(incoming[id] ?? 0);
+    const deficit = Math.max(0, n - stock - inc);
+    const coverage = n > 0 ? (stock + inc) / n : 1;
+    out[id] = { need: n, stock, incoming: inc, deficit, coverage };
+    if (stock < n && (!bottleneck || coverage < out[bottleneck].coverage)) bottleneck = id;
+  }
+  return { items: out, bottleneck };
+}
+
+/** How to restock an item (own production or purchase), or null. */
+export function restockPlan(state, c, id, quantity) {
+  return sourceFor(state, c, procurementOffers(state, c.id), 'equipment', id, Math.max(1, Math.ceil(quantity)));
+}

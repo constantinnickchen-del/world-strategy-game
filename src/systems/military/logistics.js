@@ -91,7 +91,8 @@ export function stepSupplies(state, c, wallet) {
 export function refitUnits(c) {
   const m = c.military;
   const needs = {};
-  const units = m.units.filter((u) => u.equip < 0.999 && u.status !== 'training');
+  // formations in training are equipped too, so they are ready when training ends
+  const units = m.units.filter((u) => u.equip < 0.999 && u.status !== 'reserve');
   for (const u of units) {
     const missing = (1 - u.equip) * u.strength;
     for (const [k, v] of Object.entries(UNIT_TYPES[u.type].equipment)) needs[k] = (needs[k] ?? 0) + v * missing;

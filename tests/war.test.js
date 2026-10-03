@@ -481,3 +481,23 @@ test('war score is relative to the whole coalition; capitals are never ceded; me
   assert.ok(computeWarScore(t, war) < 30, `score against the coalition stays low (${computeWarScore(t, war).toFixed(1)})`);
   assert.match(peaceTermsError(t, war, 'attackers', { regions: ['ME-16'] }), /Hauptstadtregion/);
 });
+
+test('equipment status: depots full of one item do not show it as missing; the real bottleneck is named', async () => {
+  const { equipmentStatus } = await import('../src/systems/military/quickOrders.js');
+  const s = newState({ playerId: 'DEU', seed: 'eq' });
+  const c = s.countries.DEU;
+  c.military.stock.infantryEquipment += 1e6;
+  simulateDays(s, 35);
+  const st = equipmentStatus(c);
+  assert.equal(st.items.infantryEquipment?.deficit ?? 0, 0, 'infantry equipment is covered');
+  if (st.bottleneck) assert.notEqual(st.bottleneck, 'infantryEquipment');
+  // with every item in the depots the formations are fully equipped after the next issue
+  for (const k of ['infantryEquipment', 'vehicles', 'armor', 'artillery', 'drones', 'airDefense', 'radar']) c.military.stock[k] += 1e5;
+  simulateDays(s, 31);
+  assert.deepEqual(equipmentStatus(c).items, {});
+  // formations in training get their equipment too
+  assert.equal(run(s, { type: 'raiseUnit', countryId: 'DEU', unitType: 'infantry', regionId: c.capitalRegion }).ok, true);
+  simulateDays(s, 31);
+  const recruit = c.military.units.at(-1);
+  assert.ok(recruit.equip > 0.9, `new formation equipped during training (${recruit.equip.toFixed(2)})`);
+});

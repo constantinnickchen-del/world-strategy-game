@@ -26,7 +26,7 @@ import { formatBn, formatNumber, formatPopulation, formatPrice, esc } from '../.
 import { formatDateDE } from '../../core/calendar.js';
 import { section, stat, slider, cmdButton, actionButton, attr, meter, tipAttr, flag } from '../widgets.js';
 import { countryLink } from '../components/InfoPanel.js';
-import { QUICK_ORDERS, planQuickOrder, forceSummary } from '../../systems/military/quickOrders.js';
+import { QUICK_ORDERS, planQuickOrder, forceSummary, equipmentStatus, restockPlan } from '../../systems/military/quickOrders.js';
 
 export const MILITARY_TABS = [
   ['quick', 'Aufrüsten'],
@@ -430,26 +430,46 @@ function facilities(ui) {
 }
 
 function stock(ui) {
+  const state = ui.session.state;
   const c = ui.session.player;
   const m = c.military;
-  const need = {};
-  for (const u of m.units) {
-    if (u.status === 'reserve') continue;
-    const missing = Math.max(0, 1 - u.equip) * u.strength;
-    for (const [k, v] of Object.entries(UNIT_TYPES[u.type].equipment)) need[k] = (need[k] ?? 0) + v * missing;
-  }
+  const eq = equipmentStatus(c);
   const war = dailyNeeds(c, 1);
-  const rows = EQUIPMENT_IDS.map((id) => {
+  const equipRows = EQUIPMENT_IDS.filter((id) => !CONSUMABLES.includes(id)).map((id) => {
     const d = EQUIPMENT[id];
-    const consumable = CONSUMABLES.includes(id);
+    const st = eq.items[id];
+    let status = '<span class="good">vollständig</span>';
+    let action = '';
+    if (st) {
+      if (st.deficit > 0) {
+        status = `<span class="bad">${formatNumber(st.deficit)} fehlen</span>`;
+        const plan = restockPlan(state, c, id, st.deficit * 1.05);
+        action = plan ? cmdButton(ui, 'Bestellen', plan.cmd, { cls: 'btn-sm', tip: `${formatNumber(plan.cmd.quantity)} ${d.unit} – ${esc(plan.how)}, ${formatBn(plan.cost)}, ca. ${plan.months} Mon.` }) : '<span class="small muted">nicht beschaffbar</span>';
+      } else if (st.stock < st.need) {
+        status = '<span class="warn">bestellt</span>';
+      } else {
+        status = `<span class="good"${tipAttr('Liegt im Lager und wird zum Monatsersten an die Verbände ausgegeben – sofern der Engpass es zulässt.')}>im Lager</span>`;
+      }
+    }
+    return `<tr${eq.bottleneck === id ? ' class="is-bottleneck"' : ''}><td>${d.name}${eq.bottleneck === id ? ' <span class="chip chip-bad">Engpass</span>' : ''}</td>
+      <td class="num">${st ? formatNumber(st.need) : '–'}</td>
+      <td class="num">${formatNumber(m.stock[id])}</td>
+      <td class="num">${st?.incoming ? formatNumber(st.incoming) : '–'}</td>
+      <td class="small">${status}</td><td>${action}</td></tr>`;
+  }).join('');
+  const supplyRows = CONSUMABLES.map((id) => {
+    const d = EQUIPMENT[id];
     const days = war[id] ? m.stock[id] / war[id] : null;
     return `<tr><td>${d.name}</td><td class="num">${formatNumber(m.stock[id])} ${d.unit}</td>
-      <td class="num">${consumable ? (war[id] ? `${formatNumber(war[id])}/Tag` : '–') : need[id] ? `<span class="bad">${formatNumber(need[id])} fehlen</span>` : '<span class="good">gedeckt</span>'}</td>
+      <td class="num">${war[id] ? `${formatNumber(war[id])}/Tag` : '–'}</td>
       <td class="num ${days !== null && days < 20 ? 'bad' : ''}">${days !== null ? `${formatNumber(Math.min(999, days))} Tage` : '–'}</td>
       <td class="small muted">${d.factory ? FACILITIES[d.factory].name : 'Weltmarkt'}</td></tr>`;
   }).join('');
+  const bn = eq.bottleneck ? EQUIPMENT[eq.bottleneck].name : null;
   return `
-    ${section('Lagerbestände', `<div class="table-wrap"><table class="data-table"><thead><tr><th>Gut</th><th>Bestand</th><th${tipAttr('Ausrüstung: Fehlbedarf der aktiven Verbände. Verbrauchsgüter: Bedarf pro Kampftag.')}>Bedarf</th><th${tipAttr('Reichweite bei vollem Kampfeinsatz aller aktiven Verbände')}>Reichweite</th><th>Quelle</th></tr></thead><tbody>${rows}</tbody></table></div>
+    ${section('Ausrüstung der Verbände', `<div class="howto small">Ein Verband wird nur so weit aufgefüllt, wie <b>alle</b> Güter vorhanden sind, die er braucht. ${bn ? `Derzeit bremst <b>${esc(bn)}</b> – mehr von anderen Gütern hilft erst, wenn dieser Engpass behoben ist.` : 'Alle Verbände sind versorgt.'} Neue Ausrüstung wird jeweils zum Monatsersten an die Truppe ausgegeben.</div>
+      <div class="table-wrap"><table class="data-table"><thead><tr><th>Gut</th><th${tipAttr('Was den Verbänden (auch in Ausbildung) bis zur vollen Ausrüstung fehlt')}>Bedarf</th><th>Im Lager</th><th${tipAttr('Bestellt: laufende Produktion und Kaufverträge')}>Bestellt</th><th>Status</th><th></th></tr></thead><tbody>${equipRows}</tbody></table></div>`)}
+    ${section('Verbrauchsgüter', `<div class="table-wrap"><table class="data-table"><thead><tr><th>Gut</th><th>Bestand</th><th${tipAttr('Bedarf pro Tag bei vollem Kampfeinsatz')}>Bedarf</th><th${tipAttr('Reichweite bei vollem Kampfeinsatz aller aktiven Verbände')}>Reichweite</th><th>Quelle</th></tr></thead><tbody>${supplyRows}</tbody></table></div>
       <p class="muted small">Treibstoff und Verpflegung werden monatlich am Weltmarkt nachgekauft (Ölknappheit durch Embargos/Blockaden begrenzt Treibstoff). Munition, Ersatzteile und Ausrüstung kommen aus der Produktion; Notkäufe sind teuer und begrenzt.</p>
       ${isAtWar(ui.session.state, c.id) && m.supplyFill ? `<p class="small">Nachschub gestern: Treibstoff ${pct(m.supplyFill.fuel)}, Munition ${pct(m.supplyFill.ammunition)}, Verpflegung ${pct(m.supplyFill.rations)}</p>` : ''}`)}`;
 }
