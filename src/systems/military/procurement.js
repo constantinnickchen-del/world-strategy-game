@@ -14,7 +14,7 @@
 import { SUPPLIERS, SUPPLIER_BY_ID } from '../../data/military/suppliers.js';
 import { getOpinion, hasEmbargo, alliesOf, hasTreaty } from '../diplomacy.js';
 import { areEnemies } from '../war/wars.js';
-import { itemDef, deliverItem } from './production.js';
+import { itemDef, deliverItem, MAX_ORDER_QUANTITY } from './production.js';
 import { addNews } from '../news.js';
 import { formatBn } from '../../util/format.js';
 
@@ -63,7 +63,7 @@ export function procurementOffers(state, buyerId) {
         unitPrice: price,
         leadMonths: Math.round(entry.lead + Math.max(0, backlog - 4) * 1.5),
         rate: entry.rate,
-        maxQuantity: Math.max(1, Math.ceil(entry.rate * 48)),
+        maxQuantity: MAX_ORDER_QUANTITY,
         refusal,
       });
     }

@@ -9,8 +9,8 @@ import { STATIC_REGIONS } from '../state/worldIndex.js';
 import { newUnit } from '../state/militarySetup.js';
 import { unitLabel } from '../systems/military/units.js';
 import { setMobilization, mobilizablePopulation, recruitPlan, trainingCapacity } from '../systems/military/manpower.js';
-import { canProduce, itemDef } from '../systems/military/production.js';
-import { findOffer, signContract } from '../systems/military/procurement.js';
+import { canProduce, itemDef, MAX_ORDER_QUANTITY } from '../systems/military/production.js';
+import { findOffer, signContract, DOWN_PAYMENT } from '../systems/military/procurement.js';
 import { constructionError, startConstruction } from '../systems/military/construction.js';
 import { refreshPower } from '../systems/military/power.js';
 import { planQuickOrder, QUICK_ORDER_BY_ID, hasHomePort } from '../systems/military/quickOrders.js';
@@ -166,7 +166,7 @@ export const MILITARY_COMMANDS = {
   queueProduction: {
     validate(state, { countryId, kind, item, quantity }) {
       const c = state.countries[countryId];
-      if (!(Number.isInteger(quantity) && quantity > 0 && quantity <= 100000)) return 'Ungültige Menge.';
+      if (!(Number.isInteger(quantity) && quantity > 0 && quantity <= MAX_ORDER_QUANTITY)) return 'Menge: 1 bis 1.000.000.000.';
       if (c.military.production.length >= MAX_QUEUE) return `Höchstens ${MAX_QUEUE} Produktionsaufträge.`;
       return canProduce(state, c, kind, item);
     },
@@ -211,8 +211,10 @@ export const MILITARY_COMMANDS = {
       const offer = findOffer(state, countryId, supplier, kind, item);
       if (!offer) return 'Dieses Angebot existiert nicht.';
       if (offer.refusal) return offer.refusal;
-      if (!(Number.isInteger(quantity) && quantity > 0)) return 'Ungültige Menge.';
-      if (quantity > offer.maxQuantity) return `Höchstens ${offer.maxQuantity} Stück pro Vertrag.`;
+      if (!(Number.isInteger(quantity) && quantity > 0 && quantity <= offer.maxQuantity)) return 'Menge: 1 bis 1.000.000.000.';
+      const down = quantity * offer.unitPrice * DOWN_PAYMENT;
+      const treasury = Math.max(0, state.countries[countryId].economy.treasury);
+      if (down > treasury) return `Die Anzahlung (${formatBn(down)}) übersteigt die Staatskasse (${formatBn(treasury)}) – kleinere Menge wählen.`;
       if (kind === 'ship' && !hasHomePort(state, state.countries[countryId])) return 'Kein Hafen – zuerst eine Marinebasis oder Werft bauen.';
       if (state.countries[countryId].military.contracts.filter((c) => c.status !== 'completed').length >= 12) return 'Höchstens 12 laufende Verträge.';
       return null;

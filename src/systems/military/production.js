@@ -122,6 +122,9 @@ export function deliverItem(state, c, kind, id, count = 1) {
 }
 
 /** @param {{take:Function}} wallet */
+/** Largest quantity a single production order or purchase contract may have. */
+export const MAX_ORDER_QUANTITY = 1_000_000_000;
+
 export function stepProduction(state, c, wallet) {
   const m = c.military;
   m.resourceUse = {};

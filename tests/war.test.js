@@ -232,6 +232,9 @@ test('7: aircraft production – factory capacity, budget and delivery to the ai
   const before = aircraftCount(s.countries.DEU, 'fighter');
   assert.equal(run(s, { type: 'queueProduction', countryId: 'DEU', kind: 'aircraft', item: 'jaegerMk1', quantity: 6 }).ok, true);
   assert.match(run(s, { type: 'queueProduction', countryId: 'DEU', kind: 'aircraft', item: 'advancedFighter', quantity: 1 }).error, /Technologie/);
+  assert.equal(run(s, { type: 'queueProduction', countryId: 'DEU', kind: 'equipment', item: 'ammunition', quantity: 1_000_000_000 }).ok, true, 'orders up to one billion');
+  assert.match(run(s, { type: 'queueProduction', countryId: 'DEU', kind: 'equipment', item: 'ammunition', quantity: 1_000_000_001 }).error, /1\.000\.000\.000/);
+  s.countries.DEU.military.production.pop();
   simulateDays(s, 100);
   assert.equal(aircraftCount(s.countries.DEU, 'fighter') - before >= 6, true, 'six new fighters in service');
   assert.equal(s.countries.DEU.military.aircraft.jaegerMk1.count, 6);
@@ -274,6 +277,9 @@ test('9: international procurement – contract, down payment, lead time, delive
   const iran = procurementOffers(s, 'IRN').find((o) => o.supplier === 'atlantic');
   assert.match(iran.refusal, /Embargo/);
   assert.match(run(s, { type: 'signContract', countryId: 'IRN', supplier: 'atlantic', kind: iran.kind, item: iran.item, quantity: 1 }).error, /Embargo/);
+  // big contracts are allowed, but the down payment must come out of the treasury
+  assert.equal(offer.maxQuantity, 1_000_000_000);
+  assert.match(run(s, { type: 'signContract', countryId: 'POL', supplier: 'liberty', kind: 'equipment', item: 'vehicles', quantity: 1_000_000_000 }).error, /Anzahlung/);
 });
 
 // ---------------------------------------------------------------- 10

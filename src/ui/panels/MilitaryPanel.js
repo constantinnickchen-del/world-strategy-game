@@ -345,7 +345,7 @@ function production(ui) {
   </tbody></table></div>`;
   const form = `<form class="inline-form" data-cmd-form="${attr({ type: 'queueProduction' })}">
       <label class="field grow"><span>Produkt</span><select name="product">${productOptions(state, c)}</select></label>
-      <label class="field"><span>Menge</span><input type="number" name="quantity" min="1" max="100000" step="1" value="10"></label>
+      <label class="field"><span>Menge</span><input type="number" name="quantity" min="1" max="1000000000" step="1" value="10"></label>
       <button class="btn btn-primary" type="submit">In Auftrag geben</button>
     </form>`;
   const queue = m.production.length
@@ -388,7 +388,7 @@ function procurement(ui) {
       const rows = list
         .filter((o) => filter === 'all' || o.kind === filter)
         .map((o) => `<tr><td>${esc(o.name)} <span class="muted small">${KIND_NAMES[o.kind]}</span></td><td class="num">${formatPrice(o.unitPrice)}</td><td class="num">${o.leadMonths} Mon.</td><td class="num">${o.rate >= 1 ? formatNumber(o.rate) : o.rate.toFixed(2)}/Mon.</td>
-          <td>${o.refusal ? '' : `<form class="inline-form compact" data-cmd-form="${attr({ type: 'signContract', supplier: o.supplier, kind: o.kind, item: o.item })}"><input type="number" name="quantity" min="1" max="${o.maxQuantity}" value="${Math.max(1, Math.min(o.maxQuantity, Math.round(o.rate * 12)))}" aria-label="Menge"><button class="btn btn-sm" type="submit"${tipAttr(`Höchstens ${formatNumber(o.maxQuantity)} Stück. Anzahlung 15 % sofort, Rest bei Lieferung aus dem Verteidigungshaushalt.`)}>Kaufen</button></form>`}</td></tr>`)
+          <td>${o.refusal ? '' : `<form class="inline-form compact" data-cmd-form="${attr({ type: 'signContract', supplier: o.supplier, kind: o.kind, item: o.item })}"><input type="number" name="quantity" min="1" max="${o.maxQuantity}" value="${Math.max(1, Math.min(o.maxQuantity, Math.round(o.rate * 12)))}" aria-label="Menge"><button class="btn btn-sm" type="submit"${tipAttr(`Bis zu ${formatNumber(o.maxQuantity)} Stück (Lieferung ${o.rate >= 1 ? formatNumber(o.rate) : o.rate.toFixed(2)} pro Monat). Anzahlung 15 % sofort aus der Staatskasse, Rest bei Lieferung aus dem Verteidigungshaushalt.`)}>Kaufen</button></form>`}</td></tr>`)
         .join('');
       if (!rows) return '';
       return `<div class="supplier-card${s.refusal ? ' is-refused' : ''}"><header><b>${esc(s.supplierName)}</b><span class="small muted">${home ? `${flag(home)} ${esc(home.name)}` : ''}</span></header>
