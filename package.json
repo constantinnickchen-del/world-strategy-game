@@ -1,0 +1,18 @@
+{
+  "name": "world-strategy",
+  "version": "0.1.0",
+  "description": "Langfristiges Grand-Strategy-Spiel für den Browser (HTML, CSS, JavaScript).",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node tools/serve.mjs",
+    "test": "node --test \"tests/**/*.test.js\"",
+    "test:e2e": "node tests/e2e/smoke.mjs",
+    "simulate": "node tools/simulate.mjs",
+    "build:world": "node tools/build-world.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}
