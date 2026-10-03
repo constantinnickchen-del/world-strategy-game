@@ -2,7 +2,7 @@
  * Daily war pipeline: movement → front management → battles/air/sea per war
  * → supply & exhaustion per belligerent → capitulations → cleanup.
  */
-import { activeWars, warsOf, sideOf, otherSide, cleanupWars, concludePeace } from './wars.js';
+import { activeWars, warsOf, sideOf, otherSide, cleanupWars, concludePeace, separatePeace } from './wars.js';
 import { stepMovement, friendlyCountries } from './movement.js';
 import { stepWarDay, stepWarSupply } from './combat.js';
 import { runFrontAI } from './frontAI.js';
@@ -50,8 +50,14 @@ export const warSystem = {
       c.military.noControlDays = own === 0 ? (c.military.noControlDays ?? 0) + 1 : 0;
       if (c.military.noControlDays >= CAPITULATION_DAYS) {
         for (const w of warsOf(state, id)) {
-          const winners = otherSide(sideOf(w, id));
-          const regions = c.regionIds.filter((rid) => w[winners].includes(state.regions[rid].controller));
+          const side = sideOf(w, id);
+          if (w[side].length > 1) {
+            // a coalition member gives up alone – the rest of its side fights on
+            separatePeace(state, w, id, ctx);
+            continue;
+          }
+          const winners = otherSide(side);
+          const regions = c.regionIds.filter((rid) => w[winners].includes(state.regions[rid].controller) && rid !== c.capitalRegion);
           concludePeace(state, w, winners, { regions, reparations: 0 }, ctx);
         }
         c.military.noControlDays = 0;

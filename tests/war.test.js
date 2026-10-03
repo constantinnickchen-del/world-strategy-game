@@ -460,3 +460,24 @@ test('assistant help offers: budget repair really reduces the deficit, tax relie
   assert.equal(run(r, { ...rt.fix.commands[0], countryId: 'DEU' }).ok, true);
   assert.ok(r.countries.DEU.technology.current);
 });
+
+test('war score is relative to the whole coalition; capitals are never ceded; members capitulate alone', async () => {
+  const { setTreaty } = await import('../src/systems/diplomacy.js');
+  const { computeWarScore, joinWar, peaceTermsError } = await import('../src/systems/war/wars.js');
+  // strong vs weak: Greece against Montenegro alone wins
+  const s = newState({ playerId: 'GRC', seed: 'c1' });
+  for (const t of ['alliance', 'nonAggression', 'trade']) setTreaty(s, 'GRC', 'MNE', t, false);
+  assert.equal(run(s, { type: 'declareWar', countryId: 'GRC', targetId: 'MNE', goals: [goal('ME-16')] }).ok, true);
+  simulateDays(s, 120);
+  assert.ok(!Object.values(s.regions).some((r) => r.owner === 'GRC' && r.controller !== 'GRC'), 'Greece loses nothing to Montenegro');
+  assert.ok(s.countries.MNE.regionIds.includes(s.countries.MNE.capitalRegion), 'Montenegro keeps its capital region');
+  // coalition: overrunning a small member is not a victory over the coalition
+  const t = newState({ playerId: 'GRC', seed: 'c2' });
+  for (const k of ['alliance', 'nonAggression', 'trade']) setTreaty(t, 'GRC', 'MNE', k, false);
+  assert.equal(run(t, { type: 'declareWar', countryId: 'GRC', targetId: 'MNE', goals: [goal('ME-16')] }).ok, true);
+  const war = activeWars(t)[0];
+  if (!war.defenders.includes('USA')) joinWar(t, war, 'USA', 'defenders', ctxFor(t));
+  for (const rid of t.countries.MNE.regionIds) setController(t, rid, 'GRC');
+  assert.ok(computeWarScore(t, war) < 30, `score against the coalition stays low (${computeWarScore(t, war).toFixed(1)})`);
+  assert.match(peaceTermsError(t, war, 'attackers', { regions: ['ME-16'] }), /Hauptstadtregion/);
+});

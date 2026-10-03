@@ -7,7 +7,7 @@
 import { BUDGET_CATEGORIES, TAX_LIMITS, debtRatio } from '../state/selectors.js';
 import { availableTechs, techCost } from './technology.js';
 import { evaluateProposal } from './diplomacy.js';
-import { evaluatePeace, sideOf, otherSide } from './war/wars.js';
+import { evaluatePeace, sideOf, otherSide, isCapitalRegion } from './war/wars.js';
 import { STATIC_REGIONS } from '../state/worldIndex.js';
 import { formatBn, formatPct } from '../util/format.js';
 
@@ -161,7 +161,7 @@ export function winningWarFix(state, c, war) {
   const friends = new Set(war[side]);
   const goals = new Set(war.goals.filter((g) => g.type === 'region').map((g) => g.regionId));
   const occupied = Object.values(state.regions)
-    .filter((r) => enemy.has(r.owner) && friends.has(r.controller))
+    .filter((r) => enemy.has(r.owner) && friends.has(r.controller) && !isCapitalRegion(state, r.id))
     .sort((a, b) => Number(goals.has(b.id)) - Number(goals.has(a.id)) || b.econ - a.econ);
   const terms = { regions: [], reparations: 0, reparationsFrom: war[otherSide(side)][0] };
   for (const r of occupied) {

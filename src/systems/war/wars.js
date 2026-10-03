@@ -87,6 +87,41 @@ export function regionWeight(state, regionId) {
   return owner.capitalRegion === regionId ? Math.min(1, w * 1.6 + 0.05) : w;
 }
 
+/** Capital regions are never ceded in a peace treaty (states are not annexed by treaty). */
+export function isCapitalRegion(state, regionId) {
+  const r = state.regions[regionId];
+  return !!r && state.countries[r.owner]?.capitalRegion === regionId;
+}
+
+/** Population and economic output of a whole war side (all members). */
+export function sideTotals(state, ids) {
+  let pop = 0;
+  let econ = 0;
+  for (const id of ids) {
+    const c = state.countries[id];
+    if (!c) continue;
+    for (const rid of c.regionIds) {
+      pop += state.regions[rid].population;
+      econ += state.regions[rid].econ;
+    }
+  }
+  return { pop, econ };
+}
+
+/**
+ * Weight of a region for a whole war side: a region of a small member counts
+ * little against a large coalition (occupying Montenegro does not defeat NATO).
+ * For a side with a single country this equals regionWeight().
+ */
+export function sideRegionWeight(state, regionId, totals) {
+  const r = state.regions[regionId];
+  const owner = state.countries[r.owner];
+  if (!owner || !totals.pop) return 0;
+  const own = sideTotals(state, [owner.id]);
+  const ownerShare = 0.5 * (own.pop / totals.pop) + 0.5 * (own.econ / Math.max(1e-6, totals.econ));
+  return regionWeight(state, regionId) * Math.min(1, ownerShare);
+}
+
 function warName(state, attacker, defender) {
   const a = state.countries[attacker].name;
   const d = state.countries[defender].name;
@@ -276,9 +311,10 @@ export function computeWarScore(state, war) {
   let occ = 0;
   const attackers = new Set(war.attackers);
   const defenders = new Set(war.defenders);
+  const totals = { attackers: sideTotals(state, war.attackers), defenders: sideTotals(state, war.defenders) };
   for (const r of Object.values(state.regions)) {
     if (r.owner === r.controller) continue;
-    const w = regionWeight(state, r.id) * 100;
+    const w = sideRegionWeight(state, r.id, defenders.has(r.owner) ? totals.defenders : totals.attackers) * 100;
     const goalBonus = war.goals.some((g) => g.type === 'region' && g.regionId === r.id) ? 1.5 : 1;
     if (defenders.has(r.owner) && attackers.has(r.controller)) occ += w * goalBonus;
     else if (attackers.has(r.owner) && defenders.has(r.controller)) occ -= w * goalBonus;
@@ -298,7 +334,10 @@ export function computeWarScore(state, war) {
 export function peaceCost(state, war, terms) {
   if (terms.whitePeace) return 0;
   let cost = 0;
-  for (const rid of terms.regions ?? []) cost += 4 + regionWeight(state, rid) * 110;
+  // the owner's own loss and what it means for its whole side
+  const sideIds = war.attackers.includes(state.regions[(terms.regions ?? [])[0]]?.owner) ? war.attackers : war.defenders;
+  const totals = sideTotals(state, sideIds);
+  for (const rid of terms.regions ?? []) cost += 4 + regionWeight(state, rid) * 20 + sideRegionWeight(state, rid, totals) * 90;
   if (terms.reparations > 0) {
     const payer = state.countries[terms.reparationsFrom];
     cost += (terms.reparations / Math.max(1, payer?.economy.gdp ?? 1)) * 150;
@@ -315,6 +354,7 @@ export function peaceTermsError(state, war, side, terms) {
     const r = state.regions[rid];
     if (!r) return 'Unbekannte Region.';
     if (!enemy.has(r.owner)) return `${STATIC_REGIONS[rid].name} gehört keinem Kriegsgegner.`;
+    if (isCapitalRegion(state, rid)) return `${STATIC_REGIONS[rid].name} ist die Hauptstadtregion von ${state.countries[r.owner].name} und kann nicht abgetreten werden.`;
     if (!friends.has(r.controller)) return `${STATIC_REGIONS[rid].name} muss zuerst besetzt werden.`;
   }
   if (!(terms.regions?.length) && !(terms.reparations > 0)) return 'Leere Forderungen – für einen Frieden ohne Forderungen „Weißen Frieden“ wählen.';
@@ -412,11 +452,66 @@ export function concludePeace(state, war, side, terms, ctx) {
   if (all.includes(state.playerId)) ctx?.bus?.emit('interrupt', { kind: 'peace', warId: war.id });
 }
 
+/**
+ * A member of a coalition capitulates and leaves the war on its own: its
+ * occupied regions go to the occupiers, regions it occupies return to their
+ * owners, and it gets a truce with the other side. The war goes on.
+ */
+export function separatePeace(state, war, countryId, ctx) {
+  const side = sideOf(war, countryId);
+  if (!side) return;
+  const winners = new Set(war[otherSide(side)]);
+  const c = state.countries[countryId];
+  const ceded = [];
+  for (const rid of [...c.regionIds]) {
+    const r = state.regions[rid];
+    if (winners.has(r.controller) && rid !== c.capitalRegion) {
+      ceded.push(rid);
+      transferRegion(state, rid, r.controller);
+    }
+  }
+  for (const r of Object.values(state.regions)) {
+    if (r.controller === countryId && r.owner !== countryId) setController(state, r.id, r.owner);
+    if (r.siege?.by === countryId) r.siege = null;
+  }
+  const wasLeader = war[side][0] === countryId;
+  war[side] = war[side].filter((id) => id !== countryId);
+  if (wasLeader) promoteLeader(state, war, side);
+  for (const w of winners) state.truces[pairKey(countryId, w)] = state.time.day + TRUCE_DAYS;
+  c.ai.noWarUntil = state.time.day + 10 * 365;
+  if (!c.eliminated) {
+    for (const u of c.military.units) {
+      u.target = null;
+      u.attacking = false;
+      u.arrival = null;
+      if (state.regions[u.region]?.controller !== countryId) u.region = c.capitalRegion;
+    }
+  }
+  addNews(state, {
+    category: 'world',
+    countryId,
+    others: [...winners],
+    importance: [countryId, ...winners].includes(state.playerId) ? 3 : 2,
+    text: `${c.name} kapituliert und scheidet aus dem ${war.name} aus${ceded.length ? ` – ${ceded.length} Region(en) abgetreten` : ''}. Der Krieg geht weiter.`,
+  });
+  ctx?.bus?.emit('war:changed', war);
+}
+
+/** The strongest remaining member leads a side (negotiates peace for it). */
+function promoteLeader(state, war, side) {
+  if (war[side].length < 2) return;
+  const best = war[side].reduce((a, b) => (state.countries[b].military.power > state.countries[a].military.power ? b : a));
+  war[side] = [best, ...war[side].filter((id) => id !== best)];
+}
+
 /** Removes eliminated countries from wars and ends wars with an empty side. */
 export function cleanupWars(state, ctx) {
   for (const w of activeWars(state)) {
+    const leaders = [w.attackers[0], w.defenders[0]];
     w.attackers = w.attackers.filter((id) => !state.countries[id].eliminated);
     w.defenders = w.defenders.filter((id) => !state.countries[id].eliminated);
+    if (w.attackers[0] !== leaders[0]) promoteLeader(state, w, 'attackers');
+    if (w.defenders[0] !== leaders[1]) promoteLeader(state, w, 'defenders');
     if (!w.attackers.length || !w.defenders.length) {
       w.status = 'ended';
       w.endDay = state.time.day;

@@ -13,7 +13,7 @@ import { executeCommand } from '../commands/commands.js';
 import { STATIC_REGIONS, neighborCountryIds } from '../state/worldIndex.js';
 import { RESOURCE_IDS } from '../data/resources.js';
 import { getOpinion, alliesOf, hasTreaty } from '../systems/diplomacy.js';
-import { warsOf, isAtWar, sideOf, otherSide, hasTruce, regionWeight, peaceCost } from '../systems/war/wars.js';
+import { warsOf, isAtWar, sideOf, otherSide, hasTruce, regionWeight, peaceCost, isCapitalRegion } from '../systems/war/wars.js';
 import { fireEvent } from '../systems/events.js';
 import { addNews } from '../systems/news.js';
 
@@ -203,7 +203,7 @@ function managePeace(state, c, ctx) {
     if (myScore >= 25) {
       // demand occupied goals (or valuable occupied regions) as far as the score allows
       const friends = new Set(w[side]);
-      const occupied = Object.values(state.regions).filter((r) => w[enemy].includes(r.owner) && friends.has(r.controller)).map((r) => r.id);
+      const occupied = Object.values(state.regions).filter((r) => w[enemy].includes(r.owner) && friends.has(r.controller) && !isCapitalRegion(state, r.id)).map((r) => r.id);
       const goalIds = new Set(w.goals.filter((g) => g.type === 'region').map((g) => g.regionId));
       occupied.sort((a, b) => (goalIds.has(b) ? 1 : 0) - (goalIds.has(a) ? 1 : 0) || regionWeight(state, b) - regionWeight(state, a));
       const regions = [];
