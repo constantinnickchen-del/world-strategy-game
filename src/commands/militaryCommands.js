@@ -238,13 +238,17 @@ export const MILITARY_COMMANDS = {
     },
   },
 
+  /** Starts one or several levels at once (all levels are built in parallel). */
   buildFacility: {
-    validate(state, { countryId, regionId, facility }) {
-      return constructionError(state, state.countries[countryId], regionId, facility);
+    validate(state, { countryId, regionId, facility, levels = 1 }) {
+      if (!(Number.isInteger(levels) && levels >= 1 && levels <= 10)) return 'Anzahl der Stufen: 1 bis 10.';
+      return constructionError(state, state.countries[countryId], regionId, facility, levels);
     },
-    execute(state, { countryId, regionId, facility }) {
-      const p = startConstruction(state, state.countries[countryId], regionId, facility);
-      return { message: `Bau begonnen: ${FACILITIES[facility].name} in ${STATIC_REGIONS[regionId].name} (${p.months} Monate, ${formatBn(FACILITIES[facility].cost)}).` };
+    execute(state, { countryId, regionId, facility, levels = 1 }) {
+      let p = null;
+      for (let i = 0; i < levels; i++) p = startConstruction(state, state.countries[countryId], regionId, facility);
+      const def = FACILITIES[facility];
+      return { message: `Bau begonnen: ${levels > 1 ? `${levels} Stufen ` : ''}${def.name} in ${STATIC_REGIONS[regionId].name} (${p.months} Monate, ${formatBn(def.cost * levels)}${levels > 1 ? ', alle Stufen parallel' : ''}).` };
     },
   },
 

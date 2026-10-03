@@ -106,6 +106,7 @@ export function renderRegionSection(ui, regionId) {
       }).join('');
       parts.push(`<form class="inline-form" data-cmd-form="${attr({ type: 'buildFacility', regionId })}">
           <label class="field"><span>Anlage bauen</span><select name="facility">${options}</select></label>
+          <label class="field field-narrow"><span>Stufen</span><input type="number" name="levels" min="1" max="10" step="1" value="1"></label>
           <button class="btn" type="submit">Bauen</button>
         </form>`);
       const unitOptions = UNIT_TYPE_IDS.map((t) => `<option value="${t}">${UNIT_TYPES[t].name} (${formatNumber(UNIT_TYPES[t].personnel)} Soldaten)</option>`).join('');

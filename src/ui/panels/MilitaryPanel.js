@@ -420,10 +420,20 @@ function facilities(ui) {
   const form = `<form class="inline-form" data-cmd-form="${attr({ type: 'buildFacility' })}">
       <label class="field"><span>Anlage</span><select name="facility">${FACILITY_IDS.map((f) => `<option value="${f}">${FACILITIES[f].name} (${formatBn(FACILITIES[f].cost)}, ${FACILITIES[f].months} Mon.)</option>`).join('')}</select></label>
       <label class="field"><span>Region</span><select name="regionId">${own.map((rid) => `<option value="${rid}">${esc(STATIC_REGIONS[rid].name)}${STATIC_REGIONS[rid].coastal ? ' (Küste)' : ''}</option>`).join('')}</select></label>
+      <label class="field field-narrow"><span>Stufen</span><input type="number" name="levels" min="1" max="10" step="1" value="1"></label>
       <button class="btn btn-primary" type="submit">Bauen</button>
-    </form>`;
+    </form>
+    <p class="muted small">Mehrere Stufen werden gleichzeitig gebaut – z. B. 5 Stufen Werft sind nach einer Bauzeit fertig, kosten aber 5-mal so viel pro Monat.</p>`;
+  // identical projects (same facility, region and progress) are shown as one line "× n"
+  const grouped = new Map();
+  for (const p of m.construction) {
+    const key = `${p.type}|${p.region}|${p.monthsDone}|${p.stalled ?? ''}`;
+    const g = grouped.get(key);
+    if (g) g.n++;
+    else grouped.set(key, { p, n: 1 });
+  }
   const queue = m.construction.length
-    ? `<ul class="list">${m.construction.map((p) => `<li><span>${FACILITIES[p.type].icon} ${FACILITIES[p.type].name} · ${regionLink(p.region)}</span><span class="num ${p.stalled ? 'bad' : ''}">${p.monthsDone}/${p.months} Mon.${p.stalled ? ` – ${esc(p.stalled)}` : ''}</span></li>`).join('')}</ul>`
+    ? `<ul class="list">${[...grouped.values()].map(({ p, n }) => `<li><span>${FACILITIES[p.type].icon} ${FACILITIES[p.type].name}${n > 1 ? ` <b>× ${n} Stufen</b>` : ''} · ${regionLink(p.region)}</span><span class="num ${p.stalled ? 'bad' : ''}">${p.monthsDone}/${p.months} Mon.${p.stalled ? ` – ${esc(p.stalled)}` : ''}</span></li>`).join('')}</ul>`
     : '<p class="muted small">Keine Bauprojekte.</p>';
   const withBuildings = c.regionIds.filter((rid) => Object.values(state.regions[rid].buildings).some((lv) => lv > 0));
   const list = withBuildings.length

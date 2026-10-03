@@ -2716,3 +2716,7 @@ body.is-setup #assistant {
 .meter-bad span {
   background: var(--bad);
 }
+
+.inline-form .field.field-narrow {
+  flex: 0 0 78px;
+}

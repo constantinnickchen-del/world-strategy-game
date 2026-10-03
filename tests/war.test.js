@@ -557,3 +557,16 @@ test('military power reflects soldiers and recovers in peacetime', async () => {
   const avg = c.military.units.filter((u) => u.status === 'active').reduce((x, u) => x + u.supply, 0) / c.military.units.filter((u) => u.status === 'active').length;
   assert.ok(avg > 0.8, `supply recovered (${avg.toFixed(2)})`);
 });
+
+test('several facility levels can be ordered at once', () => {
+  const s = newState({ playerId: 'GRC', seed: 'fl' });
+  const crete = 'GR-M';
+  const before = s.regions[crete].buildings.shipyard ?? 0;
+  const res = run(s, { type: 'buildFacility', countryId: 'GRC', regionId: crete, facility: 'shipyard', levels: 5 });
+  assert.equal(res.ok, true, res.error);
+  assert.equal(s.countries.GRC.military.construction.filter((p) => p.region === crete && p.type === 'shipyard').length, 5);
+  assert.match(run(s, { type: 'buildFacility', countryId: 'GRC', regionId: crete, facility: 'shipyard', levels: 10 }).error, /Höchstens noch/);
+  s.countries.GRC.budget.military = 0.1; // plenty of money for the test
+  simulateDays(s, 31 * 31);
+  assert.equal(s.regions[crete].buildings.shipyard, before + 5, 'all five levels finished together');
+});

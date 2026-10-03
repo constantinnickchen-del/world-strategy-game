@@ -7,7 +7,10 @@ import { FACILITIES } from '../../data/military/facilities.js';
 import { STATIC_REGIONS } from '../../state/worldIndex.js';
 import { addNews } from '../news.js';
 
-export function constructionError(state, c, regionId, type) {
+export const MAX_CONSTRUCTION_PROJECTS = 40;
+
+/** Why `levels` new levels cannot be started (null = possible). */
+export function constructionError(state, c, regionId, type, levels = 1) {
   const def = FACILITIES[type];
   if (!def) return 'Unbekannter Anlagentyp.';
   const r = state.regions[regionId];
@@ -15,8 +18,10 @@ export function constructionError(state, c, regionId, type) {
   if (r.owner !== c.id || r.controller !== c.id) return 'Nur in eigenen, kontrollierten Regionen möglich.';
   if (def.coastal && !STATIC_REGIONS[regionId].coastal) return 'Benötigt eine Küstenregion.';
   const queued = c.military.construction.filter((p) => p.region === regionId && p.type === type).length;
-  if ((r.buildings[type] ?? 0) + queued >= def.maxLevel) return `Maximale Stufe (${def.maxLevel}) erreicht.`;
-  if (c.military.construction.length >= 12) return 'Höchstens 12 Bauprojekte gleichzeitig.';
+  const current = (r.buildings[type] ?? 0) + queued;
+  if (current >= def.maxLevel) return `Maximale Stufe (${def.maxLevel}) erreicht.`;
+  if (current + levels > def.maxLevel) return `Höchstens noch ${def.maxLevel - current} Stufe(n) möglich (Maximum ${def.maxLevel}).`;
+  if (c.military.construction.length + levels > MAX_CONSTRUCTION_PROJECTS) return `Höchstens ${MAX_CONSTRUCTION_PROJECTS} Bauprojekte gleichzeitig (frei: ${MAX_CONSTRUCTION_PROJECTS - c.military.construction.length}).`;
   return null;
 }
 
