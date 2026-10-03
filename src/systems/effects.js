@@ -152,6 +152,12 @@ export function applyEffects(state, country, effects, { otherId = null, label = 
         if (war) concludePeace(state, war, data.side, data.terms, ctx);
         break;
       }
+      case 'rejectPeace': {
+        // no new offer from this country for a year (unless the war situation changes a lot)
+        const war = state.wars.find((w) => w.id === data.warId && w.status === 'active');
+        if (war && otherId) war.peaceBlocked = { ...(war.peaceBlocked ?? {}), [otherId]: { until: state.time.day + 365, score: war.score } };
+        break;
+      }
       case 'offerWhitePeace': {
         const war = state.wars.find((w) => w.id === data.warId && w.status === 'active');
         if (!war) break;
@@ -259,6 +265,9 @@ export function describeEffects(state, country, effects, { otherId = null, data 
         break;
       case 'offerWhitePeace':
         out.push({ text: 'Waffenstillstand zu Vorkriegsgrenzen anbieten', positive: true });
+        break;
+      case 'rejectPeace':
+        out.push({ text: 'Krieg geht weiter – kein neues Angebot dieses Landes für 1 Jahr', positive: false });
         break;
       case 'militaryEquipment':
         out.push({ text: `Militärausrüstung ${eff.share > 0 ? '+' : ''}${Math.round(eff.share * 100)} %`, positive: eff.share > 0 });

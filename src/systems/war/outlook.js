@@ -31,7 +31,9 @@ export function warOutlook(state, war, side) {
   const ownExh = Math.max(...ownIds.map((id) => state.countries[id].military.exhaustion));
   const enemyExh = Math.max(...enemyIds.map((id) => state.countries[id].military.exhaustion));
   const trend = scoreTrend(war, sign);
-  const value = score * 0.6 + Math.max(-35, Math.min(35, (ratio - 1) * 30)) + (enemyExh - ownExh) * 30 + (trend ?? 0) * 0.8;
+  // a large war score (territory actually held) outweighs paper strength
+  const strengthTerm = Math.max(-35, Math.min(35, (ratio - 1) * 30)) * (1 - Math.min(1, Math.abs(score) / 80));
+  const value = score * 0.7 + strengthTerm + (enemyExh - ownExh) * 30 + (trend ?? 0) * 0.8;
 
   let verdict;
   let tone;

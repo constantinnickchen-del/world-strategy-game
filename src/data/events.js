@@ -275,7 +275,7 @@ export const EVENTS = [
     text: '{other} bietet {country} Frieden an. Bedingungen: {terms}',
     options: [
       { label: 'Frieden annehmen', effects: [{ type: 'acceptPeace' }], ai: 1, available: (state, c, inst) => (warById(state, inst.data.warId) ? null : 'Der Krieg ist bereits beendet.') },
-      { label: 'Ablehnen und weiterkämpfen', effects: [{ type: 'opinionWith', target: 'other', value: -5 }], ai: 1 },
+      { label: 'Ablehnen und weiterkämpfen', effects: [{ type: 'opinionWith', target: 'other', value: -5 }, { type: 'rejectPeace' }], ai: 1 },
     ],
   },
   {

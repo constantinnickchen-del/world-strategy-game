@@ -13,7 +13,7 @@
 import { UNIT_TYPES } from '../../data/military/army.js';
 import { STATIC_REGIONS } from '../../state/worldIndex.js';
 import { alliesOf } from '../diplomacy.js';
-import { areEnemies, comradesOf, warsOf, sideOf } from './wars.js';
+import { areEnemies, comradesOf, enemiesOf, warsOf, sideOf } from './wars.js';
 import { shipCount } from '../military/power.js';
 
 const DAY_KM_MIN = 8;
@@ -27,9 +27,21 @@ export function distanceKm(a, b) {
   return Math.hypot(dx, dy);
 }
 
-/** Countries whose territory a country may move through. */
+/**
+ * Countries whose territory a country may move through: war comrades and
+ * allies – except allies that are also allied with one of its current enemies
+ * (they stay neutral and grant passage to neither side).
+ */
 export function friendlyCountries(state, countryId) {
-  return new Set([...comradesOf(state, countryId), ...alliesOf(state, countryId)]);
+  const comrades = comradesOf(state, countryId);
+  const enemies = enemiesOf(state, countryId);
+  const out = new Set(comrades);
+  for (const ally of alliesOf(state, countryId)) {
+    if (out.has(ally)) continue;
+    if (enemies.length && enemies.some((e) => alliesOf(state, e).includes(ally))) continue;
+    out.add(ally);
+  }
+  return out;
 }
 
 /** Land path through friendly regions (BFS by hop count, returns region list incl. start/end) or null. */
@@ -101,6 +113,14 @@ export function planMove(state, c, unit, targetRegion) {
     if (STATIC_REGIONS[unit.region].coastal && STATIC_REGIONS[targetRegion].coastal) {
       return { type: 'sea', path: [unit.region, targetRegion], days: travelDays(state, unit, [unit.region, targetRegion], { sea: true }) };
     }
+    // by ship to a friendly port, then over land (e.g. from an island to an inland front)
+    if (STATIC_REGIONS[unit.region].coastal) {
+      const port = nearestPortTowards(state, c.id, friends, targetRegion);
+      if (port) {
+        const landPath = friendlyPath(state, c.id, port, targetRegion);
+        return { type: 'sea', path: [unit.region, ...landPath], days: travelDays(state, unit, [unit.region, port], { sea: true }) + travelDays(state, unit, landPath) };
+      }
+    }
     return { error: 'Keine Verbindung über eigenes oder verbündetes Gebiet und kein Seeweg.' };
   }
   const war = areEnemies(state, c.id, target.controller);
@@ -117,6 +137,27 @@ export function planMove(state, c, unit, targetRegion) {
     return { type: 'landing', path: [unit.region, targetRegion], days: travelDays(state, unit, [unit.region, targetRegion], { sea: true }) };
   }
   return { error: 'Ziel ist nicht benachbart. Verlegen Sie den Verband zuerst an die Front.' };
+}
+
+/** Friendly coastal region with a land connection to the target, nearest to the target. */
+function nearestPortTowards(state, countryId, friends, targetRegion) {
+  // regions reachable over friendly land from the target (BFS outwards)
+  const seen = new Set([targetRegion]);
+  const queue = [targetRegion];
+  let best = null;
+  while (queue.length) {
+    const rid = queue.shift();
+    if (STATIC_REGIONS[rid].coastal && friends.has(state.regions[rid].controller)) {
+      best = rid;
+      break;
+    }
+    for (const n of STATIC_REGIONS[rid].neighbors) {
+      if (seen.has(n) || !friends.has(state.regions[n]?.controller)) continue;
+      seen.add(n);
+      queue.push(n);
+    }
+  }
+  return best;
 }
 
 function countLandingUnits(state, countryId) {

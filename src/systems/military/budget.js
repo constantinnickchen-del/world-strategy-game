@@ -4,10 +4,11 @@
  * The defence budget (share of GDP, set by the head of state) is a ceiling.
  * Each month it pays, in this order:
  *   1. upkeep: personnel, maintenance of equipment/aircraft/ships, facilities
- *   2. procurement contract installments
- *   3. construction of facilities
- *   4. production lines
- *   5. automatic purchases of supplies (fuel, rations, ammunition, spare parts)
+ *   2. supplies: rations, fuel, ammunition (at war, shortfalls are bought on credit)
+ *   3. procurement contract installments
+ *   4. construction of facilities
+ *   5. production lines
+ *   6. emergency purchases of spare parts
  * Money that is not needed is not spent (it stays in the general budget).
  * If the budget does not even cover upkeep, readiness decays.
  */

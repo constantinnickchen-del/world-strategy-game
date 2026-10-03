@@ -23,10 +23,13 @@ export function stepMilitaryMonth(state, c) {
   const paid = wallet.take('upkeep', upkeep.total);
   const funding = upkeep.total > 0 ? paid / upkeep.total : 1;
   stepMaintenance(state, c, funding);
+  // food, fuel and ammunition come before new orders – an army must not starve;
+  // expensive emergency purchases of spare parts come last
+  stepSupplies(state, c, wallet, { items: ['rations', 'fuel', 'ammunition'] });
   stepProcurement(state, c, wallet);
   stepConstruction(state, c, wallet);
   stepProduction(state, c, wallet);
-  stepSupplies(state, c, wallet);
+  stepSupplies(state, c, wallet, { items: ['spareParts'], consume: false });
   refitUnits(c);
   m.spending = {
     budget,

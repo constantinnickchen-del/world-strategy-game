@@ -4,7 +4,7 @@
  * command and a peace negotiation with a deterministic acceptance forecast.
  */
 import { STATIC_REGIONS } from '../../state/worldIndex.js';
-import { activeWars, sideOf, otherSide, evaluatePeace, peaceTermsError, isCapitalRegion } from '../../systems/war/wars.js';
+import { activeWars, sideOf, otherSide, evaluatePeace, peaceTermsError } from '../../systems/war/wars.js';
 import { formatDateDE } from '../../core/calendar.js';
 import { formatBn, formatNumber, esc } from '../../util/format.js';
 import { section, cmdButton, actionButton, signClass, tipAttr, meter } from '../widgets.js';
@@ -115,7 +115,7 @@ function peaceBuilder(ui, war, side) {
   const draft = ui.peaceDraft?.warId === war.id ? ui.peaceDraft : { warId: war.id, regions: [], reparations: 0 };
   const enemies = new Set(war[otherSide(side)]);
   const friends = new Set(war[side]);
-  const occupied = Object.values(state.regions).filter((r) => enemies.has(r.owner) && friends.has(r.controller) && !isCapitalRegion(state, r.id));
+  const occupied = Object.values(state.regions).filter((r) => enemies.has(r.owner) && friends.has(r.controller));
   const goalIds = new Set(war.goals.filter((g) => g.type === 'region').map((g) => g.regionId));
   occupied.sort((a, b) => Number(goalIds.has(b.id)) - Number(goalIds.has(a.id)) || b.econ - a.econ);
   const enemyLeader = state.countries[war[otherSide(side)][0]];
@@ -133,7 +133,7 @@ function peaceBuilder(ui, war, side) {
       <div class="btn-row">${cmdButton(ui, 'Weißen Frieden anbieten', { type: 'proposePeace', warId: war.id, terms: { whitePeace: true } }, { tip: peaceTip(state, war, side, { whitePeace: true }) })}</div>
       <h4 class="sub-head">Forderungen an ${esc(enemyLeader.name)}</h4>
       <div class="goal-list">${rows}</div>
-      <p class="muted small">Hauptstadtregionen können nicht abgetreten werden – kein Staat wird per Vertrag ganz annektiert.</p>
+      <p class="muted small">Per Vertrag muss jedes Land mindestens eine Region behalten. Ist ein Land einen Monat lang vollständig besetzt, kapituliert es – dann wird es ganz erobert.</p>
       <label class="field"><span>Reparationen (Mrd. $, max. ${formatBn(enemyLeader.economy.gdp * 0.3)})</span>
         <input type="number" min="0" step="1" max="${Math.floor(enemyLeader.economy.gdp * 0.3)}" value="${draft.reparations}" data-action-change="setPeaceReparations" data-war="${war.id}"></label>
       ${verdict ? `<p class="small">Prognose: <b class="${verdict.accept ? 'good' : 'bad'}">${verdict.accept ? 'Annahme wahrscheinlich' : 'Ablehnung'}</b> (Verhandlungsstärke ${verdict.score + verdict.needed} / benötigt ${verdict.needed})</p>` : ''}

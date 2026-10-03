@@ -319,8 +319,11 @@ export function stepWarDay(state, war, ctx) {
       e.u.inCombat = true;
     }
     const garrison = 4 + (st.population / 1e6) * 3;
-    const days = clamp(14 * terrain.siege * Math.sqrt(Math.max(1, st.areaKm) / 25000), 7, 90);
-    const progressToday = (100 / days) * clamp(0.3 + power / (garrison * 6), 0.25, 1.3);
+    // an undefended region falls within a few weeks (about a month for large or rough regions)
+    // the player's offensives are a bit faster than wars between AI states, so the world map stays stable
+    const pace = attackers.some((e) => e.c.id === state.playerId) ? 1 : 1.7;
+    const days = clamp(9 * terrain.siege * Math.sqrt(Math.max(1, st.areaKm) / 25000), 5, 30) * pace;
+    const progressToday = (100 / days) * clamp(0.55 + power / (garrison * 4), 0.5, 1.6);
     if (!r.siege || r.siege.by !== attackers[0].c.id) r.siege = { by: attackers[0].c.id, progress: 0, warId: war.id };
     r.siege.progress = Math.min(100, r.siege.progress + progressToday);
     if (r.siege.progress >= 100) captureRegion(state, war, target, attackers, ctx);
@@ -387,7 +390,9 @@ export function stepWarSupply(state, c, network) {
   const owned = c.regionIds.length || 1;
   const occupied = c.regionIds.filter((rid) => state.regions[rid].controller !== c.id).length;
   const capitalLost = state.regions[c.capitalRegion]?.controller !== c.id;
-  m.exhaustion = clamp(m.exhaustion + 0.0003 + (casualties / active) * 3 + (occupied / owned) * 0.002 + (capitalLost ? 0.004 : 0), 0, 1);
+  // war weariness: time, losses relative to the army, occupied home regions, lost capital (capped per day)
+  const daily = 0.0003 + (casualties / active) * 1.5 + (occupied / owned) * 0.002 + (capitalLost ? 0.004 : 0);
+  m.exhaustion = clamp(m.exhaustion + Math.min(0.006, daily), 0, 1);
   m.casualtiesToday = 0;
   void distanceKm;
 }

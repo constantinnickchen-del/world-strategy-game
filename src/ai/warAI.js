@@ -13,7 +13,7 @@ import { executeCommand } from '../commands/commands.js';
 import { STATIC_REGIONS, neighborCountryIds } from '../state/worldIndex.js';
 import { RESOURCE_IDS } from '../data/resources.js';
 import { getOpinion, alliesOf, hasTreaty } from '../systems/diplomacy.js';
-import { warsOf, isAtWar, sideOf, otherSide, hasTruce, regionWeight, peaceCost, isCapitalRegion } from '../systems/war/wars.js';
+import { warsOf, isAtWar, sideOf, otherSide, hasTruce, regionWeight, peaceCost, canCede, concludePeace } from '../systems/war/wars.js';
 import { fireEvent } from '../systems/events.js';
 import { addNews } from '../systems/news.js';
 
@@ -192,6 +192,18 @@ function executeWarPlan(state, c, ctx) {
   if (goals.length) cmd(state, ctx, c, 'declareWar', { targetId: plan.target, goals });
 }
 
+/** A beaten AI side gives up: every region the enemy holds is ceded. */
+function capitulate(state, war, c, ctx) {
+  const side = sideOf(war, c.id);
+  const enemy = otherSide(side);
+  const regions = [];
+  for (const id of war[side]) {
+    for (const rid of state.countries[id].regionIds) if (war[enemy].includes(state.regions[rid].controller)) regions.push(rid);
+  }
+  addNews(state, { category: 'world', countryId: c.id, others: war[enemy], importance: 3, text: `${c.name} kapituliert im ${war.name}.` });
+  concludePeace(state, war, enemy, { regions, reparations: 0 }, ctx);
+}
+
 function managePeace(state, c, ctx) {
   for (const w of warsOf(state, c.id)) {
     const side = sideOf(w, c.id);
@@ -199,15 +211,25 @@ function managePeace(state, c, ctx) {
     if (w.lastPeaceProposal?.[c.id] !== undefined && state.time.day - w.lastPeaceProposal[c.id] < PEACE_INTERVAL_DAYS) continue;
     const myScore = side === 'attackers' ? w.score : -w.score;
     const enemy = otherSide(side);
+    const toPlayer = w[enemy].includes(state.playerId);
+    if (toPlayer) {
+      // AI states never ask the player for peace – they fight on and capitulate when beaten.
+      // (The player can always propose peace in the war room.)
+      const owned = c.regionIds.length || 1;
+      const occupiedShare = c.regionIds.filter((rid) => w[enemy].includes(state.regions[rid].controller)).length / owned;
+      if (myScore <= -50 && (c.military.exhaustion >= 0.7 || occupiedShare >= 0.75)) capitulate(state, w, c, ctx);
+      continue;
+    }
     const months = (state.time.day - w.startDay) / 30.44;
     if (myScore >= 25) {
       // demand occupied goals (or valuable occupied regions) as far as the score allows
       const friends = new Set(w[side]);
-      const occupied = Object.values(state.regions).filter((r) => w[enemy].includes(r.owner) && friends.has(r.controller) && !isCapitalRegion(state, r.id)).map((r) => r.id);
+      const occupied = Object.values(state.regions).filter((r) => w[enemy].includes(r.owner) && friends.has(r.controller)).map((r) => r.id);
       const goalIds = new Set(w.goals.filter((g) => g.type === 'region').map((g) => g.regionId));
       occupied.sort((a, b) => (goalIds.has(b) ? 1 : 0) - (goalIds.has(a) ? 1 : 0) || regionWeight(state, b) - regionWeight(state, a));
       const regions = [];
       for (const rid of occupied) {
+        if (!canCede(state, regions, rid)) continue;
         const next = [...regions, rid];
         if (peaceCost(state, w, { regions: next, reparationsFrom: w[enemy][0] }) <= myScore + 10) regions.push(rid);
       }

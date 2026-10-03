@@ -54,22 +54,28 @@ export function fuelAvailability(c) {
 }
 
 /** Monthly purchases to keep supplies at target levels. */
-export function stepSupplies(state, c, wallet) {
+export function stepSupplies(state, c, wallet, { items = ['rations', 'fuel', 'ammunition', 'spareParts'], consume = true } = {}) {
   const m = c.military;
   const daily = dailyNeeds(c, 1);
+  // rations first: soldiers without food are worse than idle tanks
   const targets = {
+    rations: daily.rations * STOCK_DAYS.rations,
     fuel: daily.fuel * STOCK_DAYS.fuel,
     ammunition: daily.ammunition * STOCK_DAYS.ammunition,
-    rations: daily.rations * STOCK_DAYS.rations,
     spareParts: sparePartsNeed(c) * 4,
   };
-  // peacetime training consumption (≈ 3 days of combat per month)
-  const training = dailyNeeds(c, 0.1);
-  m.stock.fuel = Math.max(0, m.stock.fuel - training.fuel * 30);
-  m.stock.ammunition = Math.max(0, m.stock.ammunition - training.ammunition * 30);
-  m.stock.rations = Math.max(0, m.stock.rations - daily.rations * 30);
+  const atWar = !!m.atWar;
+  if (consume) {
+    m.warCredits = 0;
+    // peacetime training consumption (≈ 3 days of combat per month)
+    const training = dailyNeeds(c, 0.1);
+    m.stock.fuel = Math.max(0, m.stock.fuel - training.fuel * 30);
+    m.stock.ammunition = Math.max(0, m.stock.ammunition - training.ammunition * 30);
+    m.stock.rations = Math.max(0, m.stock.rations - daily.rations * 30);
+  }
   let spent = 0;
   for (const [id, target] of Object.entries(targets)) {
+    if (!items.includes(id)) continue;
     const gap = target - m.stock[id];
     if (gap <= 0) continue;
     let qty = gap;
@@ -83,6 +89,18 @@ export function stepSupplies(state, c, wallet) {
     const money = wallet.take('supplies', qty * price);
     spent += money;
     m.stock[id] += money / price;
+    // at war, food, fuel and ammunition the defence budget cannot pay are bought on credit (war credits)
+    const short = qty * price - money;
+    if (atWar && short > 0 && id !== 'spareParts') {
+      const e = c.economy;
+      e.treasury -= short;
+      if (e.treasury < 0) {
+        e.debt += -e.treasury;
+        e.treasury = 0;
+      }
+      m.stock[id] += short / price;
+      m.warCredits += short;
+    }
   }
   return spent;
 }

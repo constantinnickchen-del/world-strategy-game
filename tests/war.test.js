@@ -461,7 +461,7 @@ test('assistant help offers: budget repair really reduces the deficit, tax relie
   assert.ok(r.countries.DEU.technology.current);
 });
 
-test('war score is relative to the whole coalition; capitals are never ceded; members capitulate alone', async () => {
+test('war score is relative to the whole coalition; a treaty never takes the last region', async () => {
   const { setTreaty } = await import('../src/systems/diplomacy.js');
   const { computeWarScore, joinWar, peaceTermsError } = await import('../src/systems/war/wars.js');
   // strong vs weak: Greece against Montenegro alone wins
@@ -470,7 +470,6 @@ test('war score is relative to the whole coalition; capitals are never ceded; me
   assert.equal(run(s, { type: 'declareWar', countryId: 'GRC', targetId: 'MNE', goals: [goal('ME-16')] }).ok, true);
   simulateDays(s, 120);
   assert.ok(!Object.values(s.regions).some((r) => r.owner === 'GRC' && r.controller !== 'GRC'), 'Greece loses nothing to Montenegro');
-  assert.ok(s.countries.MNE.regionIds.includes(s.countries.MNE.capitalRegion), 'Montenegro keeps its capital region');
   // coalition: overrunning a small member is not a victory over the coalition
   const t = newState({ playerId: 'GRC', seed: 'c2' });
   for (const k of ['alliance', 'nonAggression', 'trade']) setTreaty(t, 'GRC', 'MNE', k, false);
@@ -479,7 +478,7 @@ test('war score is relative to the whole coalition; capitals are never ceded; me
   if (!war.defenders.includes('USA')) joinWar(t, war, 'USA', 'defenders', ctxFor(t));
   for (const rid of t.countries.MNE.regionIds) setController(t, rid, 'GRC');
   assert.ok(computeWarScore(t, war) < 30, `score against the coalition stays low (${computeWarScore(t, war).toFixed(1)})`);
-  assert.match(peaceTermsError(t, war, 'attackers', { regions: ['ME-16'] }), /Hauptstadtregion/);
+  assert.match(peaceTermsError(t, war, 'attackers', { regions: [...t.countries.MNE.regionIds] }), /mindestens eine Region/);
 });
 
 test('equipment status: depots full of one item do not show it as missing; the real bottleneck is named', async () => {
@@ -500,4 +499,48 @@ test('equipment status: depots full of one item do not show it as missing; the r
   simulateDays(s, 31);
   const recruit = c.military.units.at(-1);
   assert.ok(recruit.equip > 0.9, `new formation equipped during training (${recruit.equip.toFixed(2)})`);
+});
+
+test('AI enemies never ask the player for peace – a beaten enemy capitulates', async () => {
+  const { warAdvisor } = await import('../src/ai/warAI.js');
+  const s = newState({ playerId: 'UKR', seed: 'p1' });
+  const ctx = ctxFor(s);
+  assert.equal(run(s, { type: 'declareWar', countryId: 'RUS', targetId: 'UKR', goals: [goal('UA-14')] }).ok, true);
+  const war = activeWars(s)[0];
+  const offers = () => s.events.pending.filter((e) => e.eventId === 'warPeaceOffer');
+  // Russia is winning: still no offer to the player
+  setController(s, 'UA-14', 'RUS');
+  war.score = 60;
+  for (let i = 0; i < 6; i++) {
+    s.time.day += 61;
+    warAdvisor(s, s.countries.RUS, ctx);
+  }
+  assert.equal(offers().length, 0, 'no peace offers while winning');
+  // Russia is exhausted and losing: still no white-peace offer, it capitulates instead
+  setController(s, 'UA-14', 'UKR');
+  const ruRegion = s.countries.RUS.regionIds.find((rid) => rid !== s.countries.RUS.capitalRegion);
+  setController(s, ruRegion, 'UKR');
+  war.score = -70;
+  s.countries.RUS.military.exhaustion = 0.8;
+  s.time.day += 61;
+  warAdvisor(s, s.countries.RUS, ctx);
+  assert.equal(offers().length, 0, 'no white peace offer');
+  assert.equal(war.status, 'ended', 'Russia capitulated');
+  assert.equal(s.regions[ruRegion].owner, 'UKR', 'occupied region ceded on capitulation');
+});
+
+test('a strong attacker takes regions within weeks and can conquer a small state completely', async () => {
+  const { setTreaty } = await import('../src/systems/diplomacy.js');
+  const s = newState({ playerId: 'GRC', seed: 'q9' });
+  for (const t of ['alliance', 'nonAggression', 'trade']) setTreaty(s, 'GRC', 'SVK', t, false);
+  assert.equal(run(s, { type: 'declareWar', countryId: 'GRC', targetId: 'SVK', goals: [goal('SK-KI')] }).ok, true);
+  let firstCapture = null;
+  for (let d = 1; d <= 240 && s.wars[0].status === 'active'; d++) {
+    simulateDays(s, 1);
+    if (firstCapture === null && Object.values(s.regions).some((r) => r.owner === 'SVK' && r.controller === 'GRC')) firstCapture = d;
+  }
+  assert.ok(firstCapture !== null && firstCapture <= 75, `first region taken after ${firstCapture} days`);
+  assert.ok(s.countries.GRC.military.exhaustion < 0.5, 'no absurd war weariness without losses');
+  assert.equal(s.wars[0].status, 'ended');
+  assert.ok(s.countries.SVK.regionIds.length === 0 || s.countries.GRC.regionIds.some((r) => r.startsWith('SK')), 'Slovak territory gained');
 });

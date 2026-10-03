@@ -57,7 +57,8 @@ export const warSystem = {
             continue;
           }
           const winners = otherSide(side);
-          const regions = c.regionIds.filter((rid) => w[winners].includes(state.regions[rid].controller) && rid !== c.capitalRegion);
+          // a fully occupied AI state can be conquered completely; the player always keeps the capital
+          const regions = c.regionIds.filter((rid) => w[winners].includes(state.regions[rid].controller) && (id !== state.playerId || rid !== c.capitalRegion));
           concludePeace(state, w, winners, { regions, reparations: 0 }, ctx);
         }
         c.military.noControlDays = 0;

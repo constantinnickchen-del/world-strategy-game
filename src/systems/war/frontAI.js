@@ -113,17 +113,34 @@ export function runFrontAI(state, c, { onlyAutomatic = false } = {}) {
     })
     .filter((x) => x.need > 0)
     .sort((a, b) => b.need - a.need);
-  if (frontNeeds.length) {
+  // front regions to reinforce: threatened ones first, then the ones next to war goals
+  const frontTargets = [...frontNeeds.map((x) => x.rid)];
+  for (const rid of fs.frontOwn) {
+    if (frontTargets.includes(rid)) continue;
+    const r = state.regions[rid];
+    if (r.controller !== c.id && !fs.friends.has(r.controller)) continue;
+    if (stance !== 'defensive' || STATIC_REGIONS[rid].neighbors.some((n) => state.regions[n]?.owner === c.id)) frontTargets.push(rid);
+  }
+  frontTargets.sort((a, b) => Number(STATIC_REGIONS[b].neighbors.some((n) => fs.goalRegions.has(n))) - Number(STATIC_REGIONS[a].neighbors.some((n) => fs.goalRegions.has(n))));
+  if (frontTargets.length) {
+    // a share of the army belongs at the front even against a weak enemy (otherwise nothing ever happens)
+    const share = stance === 'offensive' ? 0.85 : stance === 'defensive' ? 0.45 : 0.7;
+    const atFront = units.filter((u) => fs.frontOwn.has(u.region) || (u.target && fs.frontOwn.has(u.target)) || u.attacking).length;
+    let missing = Math.max(frontNeeds.length ? units.length : 0, Math.ceil(units.length * share)) - atFront;
     const idle = units.filter((u) => !u.target && !fs.frontOwn.has(u.region) && u.region !== c.capitalRegion);
     // keep a small capital guard
     const capitalGuard = units.filter((u) => u.region === c.capitalRegion && !u.target);
     const spareCapital = capitalGuard.slice(fs.frontOwn.has(c.capitalRegion) ? 0 : 1);
     let i = 0;
     for (const u of [...idle, ...spareCapital]) {
-      const dest = frontNeeds[i % frontNeeds.length];
+      if (missing <= 0) break;
+      const dest = frontTargets[i % frontTargets.length];
       i++;
-      const plan = planMove(state, c, u, dest.rid);
-      if (!plan.error && plan.type !== 'attack') applyMove(state, u, plan);
+      const plan = planMove(state, c, u, dest);
+      if (!plan.error && plan.type !== 'attack') {
+        applyMove(state, u, plan);
+        missing--;
+      }
     }
   } else if (!fs.frontEnemy.size) {
     // 3. no land front: amphibious landing on the weakest enemy coastal region

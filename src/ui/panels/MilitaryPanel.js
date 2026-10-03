@@ -186,6 +186,7 @@ function overview(ui) {
         <tr><td>Nachschub (Treibstoff, Munition, Verpflegung, Ersatzteile)</td><td class="num">${formatBn(sp.supplies ?? 0)}</td></tr>
         <tr class="tip-sum"><td>${settled ? 'Ausgegeben letzten Monat' : 'Geplant (erste Abrechnung zum Monatsersten)'}</td><td class="num">${formatBn(sp.total ?? 0)} / ${formatBn(sp.budget ?? 0)}</td></tr>
       </tbody></table>
+      ${m.warCredits > 0.0005 ? `<p class="warn small">Kriegskredite: ${formatBn(m.warCredits)} im letzten Monat für Verpflegung, Treibstoff und Munition direkt aus der Staatskasse (Budget reichte nicht). Ein höheres Verteidigungsbudget macht das planbar.</p>` : ''}
       ${(sp.funding ?? 1) < 0.999 ? `<p class="bad small">Der Haushalt deckt nur ${pct(sp.funding)} des Unterhalts – Einsatzbereitschaft und Wartung leiden.</p>` : ''}`,
     )}
     ${section(

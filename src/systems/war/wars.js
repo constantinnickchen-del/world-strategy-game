@@ -87,10 +87,22 @@ export function regionWeight(state, regionId) {
   return owner.capitalRegion === regionId ? Math.min(1, w * 1.6 + 0.05) : w;
 }
 
-/** Capital regions are never ceded in a peace treaty (states are not annexed by treaty). */
+/** Capital region of its owner? */
 export function isCapitalRegion(state, regionId) {
   const r = state.regions[regionId];
   return !!r && state.countries[r.owner]?.capitalRegion === regionId;
+}
+
+/**
+ * Can `regionId` be added to a list of ceded regions? A peace treaty never takes
+ * the last region of a state (complete conquest only happens by capitulation).
+ */
+export function canCede(state, regions, regionId) {
+  const owner = state.regions[regionId]?.owner;
+  const c = state.countries[owner];
+  if (!c) return false;
+  const taken = new Set([...regions, regionId]);
+  return c.regionIds.some((rid) => !taken.has(rid));
 }
 
 /** Population and economic output of a whole war side (all members). */
@@ -354,8 +366,11 @@ export function peaceTermsError(state, war, side, terms) {
     const r = state.regions[rid];
     if (!r) return 'Unbekannte Region.';
     if (!enemy.has(r.owner)) return `${STATIC_REGIONS[rid].name} gehört keinem Kriegsgegner.`;
-    if (isCapitalRegion(state, rid)) return `${STATIC_REGIONS[rid].name} ist die Hauptstadtregion von ${state.countries[r.owner].name} und kann nicht abgetreten werden.`;
     if (!friends.has(r.controller)) return `${STATIC_REGIONS[rid].name} muss zuerst besetzt werden.`;
+  }
+  for (const rid of terms.regions ?? []) {
+    const owner = state.countries[state.regions[rid].owner];
+    if (!owner.regionIds.some((x) => !(terms.regions ?? []).includes(x))) return `${owner.name} muss per Vertrag mindestens eine Region behalten (vollständige Eroberung nur durch Kapitulation).`;
   }
   if (!(terms.regions?.length) && !(terms.reparations > 0)) return 'Leere Forderungen – für einen Frieden ohne Forderungen „Weißen Frieden“ wählen.';
   return null;
@@ -465,7 +480,7 @@ export function separatePeace(state, war, countryId, ctx) {
   const ceded = [];
   for (const rid of [...c.regionIds]) {
     const r = state.regions[rid];
-    if (winners.has(r.controller) && rid !== c.capitalRegion) {
+    if (winners.has(r.controller) && (countryId !== state.playerId || rid !== c.capitalRegion)) {
       ceded.push(rid);
       transferRegion(state, rid, r.controller);
     }
