@@ -11,6 +11,7 @@
  * changes to technologies apply to existing saves.
  */
 import { TECH_BY_ID } from '../data/technologies.js';
+import { DIFFICULTIES } from '../data/difficulty.js';
 
 export const STATS = {
   growth: { label: 'Wirtschaftswachstum', format: 'pctPoints' },
@@ -59,6 +60,8 @@ export function techModifiers(country) {
 export function getMod(country, stat) {
   let sum = techModifiers(country)[stat] ?? 0;
   for (const m of country.modifiers) if (m.stat === stat) sum += m.value;
+  // difficulty level (stored only on the player's country)
+  if (country.difficulty) sum += DIFFICULTIES[country.difficulty]?.mods[stat] ?? 0;
   return sum;
 }
 

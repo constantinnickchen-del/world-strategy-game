@@ -8,6 +8,7 @@
  * mobilisation, troop build-up at the border – which can trigger a warning to
  * the player), and declares only if the situation still justifies it.
  */
+import { DIFFICULTIES } from '../data/difficulty.js';
 import { executeCommand } from '../commands/commands.js';
 import { STATIC_REGIONS, neighborCountryIds } from '../state/worldIndex.js';
 import { RESOURCE_IDS } from '../data/resources.js';
@@ -97,6 +98,11 @@ export function evaluateWarTarget(state, c, targetId) {
   const tradeShare = c.trade.partners.find((p) => p.id === targetId)?.value ?? 0;
   if (tradeShare > 0) riskAdd('Handelsabhängigkeit', -Math.min(30, (tradeShare / Math.max(1, c.trade.imports + c.trade.exports)) * 100));
   if (!border.length) riskAdd('Keine gemeinsame Grenze', -60);
+  if (targetId === state.playerId && t.difficulty) {
+    const d = DIFFICULTIES[t.difficulty];
+    if (d.warTargetScore === null) return { score: -999, goals: [], reasons: [{ text: 'Schwierigkeitsgrad', value: -999 }] };
+    if (d.warTargetScore) riskAdd('Schwierigkeitsgrad', d.warTargetScore);
+  }
   const risk = risks.reduce((s, r) => s + r.value, 0);
   // goals: claimed regions first, then valuable border regions
   const goals = [];

@@ -17,6 +17,7 @@ import {
 } from '../systems/diplomacy.js';
 import { fireEvent, resolveInstance, optionUnavailable } from '../systems/events.js';
 import { MILITARY_COMMANDS } from './militaryCommands.js';
+import { DIFFICULTIES } from '../data/difficulty.js';
 import { areEnemies } from '../systems/war/wars.js';
 import { addNews } from '../systems/news.js';
 import { formatBn } from '../util/format.js';
@@ -223,6 +224,21 @@ export const COMMANDS = {
 };
 
 Object.assign(COMMANDS, MILITARY_COMMANDS);
+
+/** Difficulty of the player's game (only the player's country carries it). */
+COMMANDS.setDifficulty = {
+  validate(state, { countryId, level }) {
+    if (!DIFFICULTIES[level]) return 'Unbekannter Schwierigkeitsgrad.';
+    if (countryId !== state.playerId) return 'Nur für das Spielerland.';
+    return null;
+  },
+  execute(state, { countryId, level }) {
+    state.meta.difficulty = level;
+    for (const id of state.countryOrder) delete state.countries[id].difficulty;
+    state.countries[countryId].difficulty = level;
+    return { message: `Schwierigkeitsgrad: ${DIFFICULTIES[level].name}.` };
+  },
+};
 
 export function validateCommand(state, cmd) {
   const def = COMMANDS[cmd?.type];

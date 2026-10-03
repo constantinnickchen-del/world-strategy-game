@@ -5,6 +5,7 @@ import { formatDateDE } from '../../core/calendar.js';
 import { esc } from '../../util/format.js';
 import { GAME_VERSION } from '../../version.js';
 import { PAUSE_REASONS } from '../../core/settings.js';
+import { DIFFICULTIES } from '../../data/difficulty.js';
 
 const TABS = [
   ['saves', 'Spielstände'],
@@ -95,7 +96,15 @@ export class MenuModal {
         <p class="muted small">Speicherort: ${esc(ui.storageLabel)}. Exportierte Dateien lassen sich auf anderen Geräten importieren.</p>`;
     } else if (this.tab === 'settings') {
       const s = ui.settings;
+      const diff = DIFFICULTIES[s.difficulty] ?? DIFFICULTIES.normal;
       body = `
+        <label class="field"><span>Schwierigkeitsgrad${inGame ? ' (gilt sofort für das laufende Spiel)' : ''}</span>
+          <select data-action-change="setSetting" data-key="difficulty" data-type="string">
+            ${Object.entries(DIFFICULTIES).map(([id, d]) => `<option value="${id}"${(s.difficulty ?? 'normal') === id ? ' selected' : ''}>${d.name}</option>`).join('')}
+          </select>
+        </label>
+        <p class="muted small">${esc(diff.description)} Assistent standardmäßig ${diff.assistant ? 'an' : 'aus'}.</p>
+        <label class="check"><input type="checkbox" data-action-change="setSetting" data-key="assistant"${s.assistant !== false ? ' checked' : ''}> Assistent anzeigen (analysiert jeden Monat Ihr Land und gibt Tipps)</label>
         <label class="field"><span>Automatisch speichern</span>
           <select data-action-change="setSetting" data-key="autosaveMonths">
             ${[[0, 'Aus'], [1, 'Jeden Monat'], [3, 'Alle 3 Monate'], [6, 'Alle 6 Monate'], [12, 'Jedes Jahr']].map(([v, l]) => `<option value="${v}"${s.autosaveMonths === v ? ' selected' : ''}>${l}</option>`).join('')}

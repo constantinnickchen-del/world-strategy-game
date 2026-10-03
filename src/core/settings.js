@@ -12,6 +12,8 @@ export const DEFAULT_SETTINGS = {
   showNewsTicker: false, // news strip at the bottom of the map
   newsToasts: false, // pop-up messages for important news
   tutorialDone: false,
+  difficulty: 'normal', // see data/difficulty.js
+  assistant: true, // monthly tips (default depends on the difficulty)
   // situations that stop the clock immediately (unchecked: advisors decide automatically)
   pauseOn: {
     warDeclared: true,

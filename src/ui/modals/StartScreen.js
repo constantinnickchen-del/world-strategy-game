@@ -9,6 +9,7 @@ import { formatBn, formatPopulation, formatUsd, formatPct, esc } from '../../uti
 import { formatDateDE } from '../../core/calendar.js';
 import { flag } from '../widgets.js';
 import { GAME_TITLE, GAME_VERSION } from '../../version.js';
+import { DIFFICULTIES } from '../../data/difficulty.js';
 
 const FEATURED = ['DEU', 'USA', 'CHN', 'RUS', 'IND', 'BRA', 'FRA', 'GBR', 'JPN', 'TUR', 'NGA', 'SAU'];
 
@@ -66,6 +67,12 @@ export class StartScreen {
           <div><dt>Schuldenquote</dt><dd class="num">${formatPct(debtRatio(c), 0)}</dd></div>
           <div><dt>Stabilität</dt><dd class="num">${Math.round(c.politics.stability)}</dd></div>
         </dl>
+        <label class="field start-difficulty"><span>Schwierigkeitsgrad</span>
+          <select data-action-change="setSetting" data-key="difficulty" data-type="string">
+            ${Object.entries(DIFFICULTIES).map(([id, d]) => `<option value="${id}"${(this.ui.settings.difficulty ?? 'normal') === id ? ' selected' : ''}>${d.name}</option>`).join('')}
+          </select>
+        </label>
+        <p class="muted small">${esc((DIFFICULTIES[this.ui.settings.difficulty] ?? DIFFICULTIES.normal).description)}${(DIFFICULTIES[this.ui.settings.difficulty] ?? DIFFICULTIES.normal).assistant ? ' Mit Assistent.' : ''}</p>
         <button class="btn btn-primary btn-big" data-action="startGame" data-id="${c.id}">Als ${esc(c.name)} spielen</button>
       </div>`;
   }

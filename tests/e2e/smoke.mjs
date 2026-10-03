@@ -104,6 +104,21 @@ try {
   await page.waitForTimeout(400);
   await shot('02-game');
 
+  console.log('Assistant & difficulty');
+  await page.waitForSelector('#assistant:not([hidden]) .assistant-tip');
+  assert(true, 'assistant shows tips on difficulty "Mittel"');
+  await shot('02b-assistant');
+  await page.click('.menu-btn');
+  await page.click('[data-action="menuTab"][data-tab="settings"]');
+  await page.selectOption('.modal select[data-key="difficulty"]', 'veryEasy');
+  assert(await page.evaluate(() => window.worldStrategy.session.state.meta.difficulty === 'veryEasy' && window.worldStrategy.session.player.difficulty === 'veryEasy'), 'difficulty applies to the running game');
+  await page.locator('.modal input[data-key="assistant"]').uncheck();
+  assert(await page.evaluate(() => document.getElementById('assistant').hidden), 'assistant can be switched off');
+  await page.locator('.modal input[data-key="assistant"]').check();
+  await page.selectOption('.modal select[data-key="difficulty"]', 'normal');
+  await page.click('.modal [data-modal-close]');
+  await page.waitForSelector('.modal', { state: 'detached' });
+
   console.log('Panels');
   await page.waitForSelector('#drawer[data-panel="overview"]:not([hidden])');
   assert(true, 'overview panel opens at game start');

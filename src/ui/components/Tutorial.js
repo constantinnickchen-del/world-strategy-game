@@ -67,6 +67,17 @@ export const TUTORIAL_STEPS = [
     prepare: (ui) => ui.setTutorialLayout({ panel: 'overview', select: null }),
   },
   {
+    target: '#assistant',
+    title: 'Ihr Assistent',
+    text: 'Der Assistent analysiert jeden Monat Ihr Land und sagt Ihnen, was gerade wichtig ist – zum Beispiel, warum die Leute unzufrieden sind und was hilft. Mit einem Klick springen Sie an die richtige Stelle. Minimieren mit „–“, ausschalten jederzeit im Menü ☰ → Einstellungen (dort stellen Sie auch den Schwierigkeitsgrad ein).',
+    prepare: (ui) => {
+      ui.setTutorialLayout({ panel: null, select: null });
+      ui.assistant.minimized = false;
+      ui.assistant.render(true);
+    },
+    fallbackTarget: '.menu-btn',
+  },
+  {
     target: '[data-tut="tax"]',
     title: 'Steuern',
     text: 'Mit dem Schieberegler legen Sie die Steuern fest. Mehr Steuern bringen mehr Geld in die Staatskasse, machen die Bevölkerung aber unzufriedener und bremsen die Wirtschaft.',

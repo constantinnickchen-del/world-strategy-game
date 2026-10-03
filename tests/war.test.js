@@ -396,3 +396,35 @@ test('front strategy: defensive general staff does not attack foreign regions', 
   assert.equal(attacking.length, 0);
   assert.ok(!Object.values(s.regions).some((r) => r.owner === 'UKR' && r.controller === 'RUS'), 'no conquests in defensive mode');
 });
+
+// ---------------------------------------------------------------- difficulty & assistant
+
+test('difficulty: modifiers for the player only, the easiest level is never attacked', async () => {
+  const { getMod } = await import('../src/systems/modifiers.js');
+  const { evaluateWarTarget } = await import('../src/ai/warAI.js');
+  const s = newState({ playerId: 'UKR', seed: 'd1' });
+  const base = getMod(s.countries.UKR, 'approval');
+  assert.equal(run(s, { type: 'setDifficulty', countryId: 'UKR', level: 'veryEasy' }).ok, true);
+  assert.ok(getMod(s.countries.UKR, 'approval') > base);
+  assert.equal(getMod(s.countries.RUS, 'approval'), getMod(newState({ playerId: 'UKR', seed: 'd1' }).countries.RUS, 'approval'), 'AI countries unaffected');
+  assert.equal(evaluateWarTarget(s, s.countries.RUS, 'UKR').score, -999);
+  assert.equal(run(s, { type: 'setDifficulty', countryId: 'UKR', level: 'veryHard' }).ok, true);
+  assert.ok(getMod(s.countries.UKR, 'approval') < base);
+  assert.equal(s.meta.difficulty, 'veryHard');
+  assert.match(run(s, { type: 'setDifficulty', countryId: 'RUS', level: 'easy' }).error, /Spielerland/);
+});
+
+test('assistant: names the cause of discontent and points to the fix', async () => {
+  const { assistantTips } = await import('../src/systems/assistant.js');
+  const s = newState({ playerId: 'DEU', seed: 'a1' });
+  const deu = s.countries.DEU;
+  deu.politics.approval = 25;
+  deu.economy.taxRate = deu.politics.taxTolerance + 0.12; // sudden tax hike
+  deu.technology.current = null;
+  const tips = assistantTips(s, deu);
+  assert.ok(tips[0].title.includes('unzufrieden'), tips[0].title);
+  assert.match(tips[0].text, /Steuern/);
+  assert.equal(tips[0].action.panel, 'economy');
+  assert.ok(tips.some((t) => t.action?.panel === 'research'));
+  for (const t of tips) assert.ok(t.title && t.text);
+});

@@ -21,6 +21,8 @@ import { EventModal } from './modals/EventModal.js';
 import { MenuModal } from './modals/MenuModal.js';
 import { StartScreen } from './modals/StartScreen.js';
 import { Tutorial } from './components/Tutorial.js';
+import { Assistant } from './components/Assistant.js';
+import { DIFFICULTIES } from '../data/difficulty.js';
 import { OverviewPanel } from './panels/OverviewPanel.js';
 import { EconomyPanel } from './panels/EconomyPanel.js';
 import { PoliticsPanel } from './panels/PoliticsPanel.js';
@@ -98,6 +100,7 @@ export class UIManager {
     this.startScreen = new StartScreen(this.el.startScreen, this);
     this.tutorial = new Tutorial($('tutorial-root'), this);
     this.declareWar = new DeclareWarModal(this);
+    this.assistant = new Assistant($('assistant'), this);
     this.map = new MapRenderer($('map'), {
       getState: () => this.session.state,
       getMode: () => this.mapMode,
@@ -124,6 +127,7 @@ export class UIManager {
     this.activePanel = null;
     if (MAP_MODE_BY_ID[this.mapMode]?.needsPlayer) this.mapMode = 'political';
     document.body.classList.add('is-setup');
+    this.assistant.render();
     this.startScreen.show();
     this.map.resetView();
     this.markAll();
@@ -131,6 +135,7 @@ export class UIManager {
 
   enterGame(state) {
     this.mode = 'game';
+    if (state.playerId) this.settings.difficulty = DIFFICULTIES[state.meta.difficulty] ? state.meta.difficulty : 'normal';
     this.session.replaceState(state);
     document.body.classList.remove('is-setup');
     this.startScreen.hide();
@@ -152,6 +157,8 @@ export class UIManager {
   startNewGame(playerId) {
     const state = this.session.newGame({ scenarioId: DEFAULT_SCENARIO, playerId, seed: Date.now() });
     this.enterGame(state);
+    this.session.execute({ type: 'setDifficulty', level: this.settings.difficulty ?? 'normal' });
+    this.assistant.render(true);
     if (this.settings.tutorialDone) {
       this.toasts.show(`Willkommen in ${state.countries[playerId].name}. Drücken Sie die Leertaste, um die Zeit zu starten.`, { ms: 6000 });
     } else {
@@ -184,7 +191,7 @@ export class UIManager {
   markAll() {
     this.revision++;
     this.rankCache = null;
-    this.mark('top', 'nav', 'drawer', 'info', 'news', 'controls', 'map', 'events');
+    this.mark('top', 'nav', 'drawer', 'info', 'news', 'controls', 'map', 'events', 'assistant');
   }
 
   ranks() {
@@ -229,6 +236,7 @@ export class UIManager {
       return;
     }
     if (d.has('news')) this.ticker.render(d.has('drawer'));
+    if (d.has('assistant')) this.assistant.render();
     if (d.has('events')) this.eventModal.sync();
     if (d.has('drawer')) {
       if (this.sliderActive) this.dirty.add('drawer');
@@ -482,8 +490,16 @@ export class UIManager {
 
   updateSetting(key, value) {
     this.settings[key] = value;
+    if (key === 'difficulty') {
+      // each level has its own assistant default; the player can still switch it afterwards
+      this.settings.assistant = DIFFICULTIES[value].assistant;
+      if (this.mode === 'game') this.execute({ type: 'setDifficulty', level: value });
+      if (this.menu.modal) this.menu.refresh();
+    }
     saveSettings(this.settings);
     this.session.settings = this.settings;
+    if (key === 'difficulty' || key === 'assistant') this.assistant.render(true);
+    if (key === 'difficulty' && this.mode === 'setup') this.mark('start');
     if (key === 'showLabels') {
       this.map.showLabels = value;
       this.mark('map', 'controls');
@@ -583,6 +599,15 @@ export class UIManager {
         if (await this.confirm('Neues Spiel beginnen? Nicht gespeicherter Fortschritt geht verloren.')) this.enterSetup();
       },
       startGame: (ds) => this.startNewGame(ds.id),
+      assistantToggle: () => {
+        this.assistant.minimized = !this.assistant.minimized;
+        this.assistant.render();
+      },
+      assistantGo: (ds) => this.openPanel(ds.panel),
+      assistantOff: () => {
+        this.updateSetting('assistant', false);
+        this.toasts.show('Assistent ausgeschaltet – im Menü ☰ → Einstellungen wieder einschalten.', { ms: 4000 });
+      },
       startTutorial: () => {
         this.menu.close();
         this.tutorial.start();
@@ -639,7 +664,7 @@ export class UIManager {
         this.updatePauseSetting(t.dataset.key, t.checked);
       } else if (action === 'setSetting') {
         const key = t.dataset.key;
-        this.updateSetting(key, t.type === 'checkbox' ? t.checked : Number(t.value));
+        this.updateSetting(key, t.type === 'checkbox' ? t.checked : t.dataset.type === 'string' ? t.value : Number(t.value));
       } else if (action === 'importGame' && t.files?.[0]) {
         this.importGame(t.files[0]);
         t.value = '';
