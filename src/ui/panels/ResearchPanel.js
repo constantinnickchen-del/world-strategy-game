@@ -53,6 +53,6 @@ export const ResearchPanel = {
         return section(`${cat.icon} ${cat.name}`, `<ul class="tech-list">${items}</ul>`);
       })
       .join('');
-    return `${section('Aktuelles Projekt', `${curHtml}<p class="muted small">Forschungspunkte: <b class="num">${formatNumber(pts, 1)}</b> pro Monat (abhängig von Forschungsbudget, Entwicklungsstand, Wirtschaftsgröße und Stabilität).</p>`)}${cats}`;
+    return `${section('Aktuelles Projekt', `${curHtml}<p class="muted small">Forschungspunkte: <b class="num">${formatNumber(pts, 1)}</b> pro Monat (abhängig von Forschungsbudget, Entwicklungsstand, Wirtschaftsgröße und Stabilität).</p>`, { tut: 'research' })}${cats}`;
   },
 };

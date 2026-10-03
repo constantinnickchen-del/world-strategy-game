@@ -50,6 +50,7 @@ export const EconomyPanel = {
           tip: '<b>Steuerquote</b><br>Höhere Steuern bringen mehr Einnahmen, senken aber Zustimmung und Wachstum. Über 45 % sinkt die Steuereffizienz (Ausweichverhalten).',
         })}
         <p class="muted small">Steuereffizienz: ${formatPct(e.lastTaxEfficiency, 0)} – abhängig von Stabilität, Infrastruktur und Verwaltung.</p>`,
+        { tut: 'tax' },
       )}
       ${section(
         'Staatsausgaben',
@@ -61,6 +62,7 @@ export const EconomyPanel = {
           <tr class="sum"><td>Saldo pro Monat</td><td class="num ${signClass(e.lastBalance)}">${formatBn(e.lastBalance)}</td></tr>
         </table>
         <p class="muted small">Änderungen wirken ab dem nächsten Monatswechsel.</p>`,
+        { tut: 'budget' },
       )}
       ${section(
         'Schulden tilgen',

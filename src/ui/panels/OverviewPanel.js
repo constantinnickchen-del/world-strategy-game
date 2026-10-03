@@ -38,7 +38,7 @@ export const OverviewPanel = {
       .map((n) => `<li class="note note-${n.tone}"><span>${esc(n.text)}</span>${n.panel ? actionButton(n.label, 'openPanel', { panel: n.panel }, { cls: 'btn-small' }) : ''}</li>`)
       .join('');
     return `
-      ${section('Berater', `<ul class="notes">${notes}</ul>`)}
+      ${section('Berater', `<ul class="notes">${notes}</ul>`, { tut: 'advisor' })}
       ${section(
         'Kennzahlen',
         `<div class="stat-grid">

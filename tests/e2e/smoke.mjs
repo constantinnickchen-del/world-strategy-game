@@ -83,6 +83,24 @@ try {
   await page.click('[data-action="startGame"]');
   await page.waitForSelector('body:not(.is-setup)');
   assert((await page.locator('.player-name').textContent()) === 'Deutschland', 'game starts as Germany');
+
+  console.log('Tutorial');
+  await page.waitForSelector('.tut-bubble');
+  assert(true, 'tutorial starts automatically in the first game');
+  const steps = await page.locator('.tut-progress i').count();
+  for (let i = 0; i < steps; i++) {
+    await page.waitForTimeout(280);
+    await shot(`tut-${String(i + 1).padStart(2, '0')}`);
+    const inView = await page.locator('.tut-bubble').evaluate((b) => {
+      const r = b.getBoundingClientRect();
+      return r.left >= 0 && r.top >= 0 && r.right <= window.innerWidth && r.bottom <= window.innerHeight;
+    });
+    if (!inView) throw new Error(`tutorial bubble outside viewport at step ${i + 1}`);
+    await page.click('[data-tut-action="next"]');
+  }
+  await page.waitForSelector('#tutorial-root', { state: 'hidden' });
+  assert(await page.evaluate(() => window.worldStrategy.ui.settings.tutorialDone === true), `tutorial (${steps} steps) completes and is remembered`);
+  assert(await page.evaluate(() => window.worldStrategy.session.clock.speed === 0), 'game stays paused during the tutorial');
   await page.waitForTimeout(400);
   await shot('02-game');
 

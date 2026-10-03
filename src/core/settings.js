@@ -9,6 +9,7 @@ export const DEFAULT_SETTINGS = {
   pauseOnEvents: true,
   newsFilter: 'relevant', // 'relevant' | 'all' | 'own'
   showLabels: true,
+  tutorialDone: false,
 };
 
 export function loadSettings(ls = globalThis.localStorage) {

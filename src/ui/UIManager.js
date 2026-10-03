@@ -20,6 +20,7 @@ import { mountCharts } from './components/Chart.js';
 import { EventModal } from './modals/EventModal.js';
 import { MenuModal } from './modals/MenuModal.js';
 import { StartScreen } from './modals/StartScreen.js';
+import { Tutorial } from './components/Tutorial.js';
 import { OverviewPanel } from './panels/OverviewPanel.js';
 import { EconomyPanel } from './panels/EconomyPanel.js';
 import { PoliticsPanel } from './panels/PoliticsPanel.js';
@@ -81,6 +82,7 @@ export class UIManager {
     this.eventModal = new EventModal(this);
     this.menu = new MenuModal(this);
     this.startScreen = new StartScreen(this.el.startScreen, this);
+    this.tutorial = new Tutorial($('tutorial-root'), this);
     this.map = new MapRenderer($('map'), {
       getState: () => this.session.state,
       getMode: () => this.mapMode,
@@ -127,7 +129,25 @@ export class UIManager {
   startNewGame(playerId) {
     const state = this.session.newGame({ scenarioId: DEFAULT_SCENARIO, playerId, seed: Date.now() });
     this.enterGame(state);
-    this.toasts.show(`Willkommen in ${state.countries[playerId].name}. Drücken Sie die Leertaste, um die Zeit zu starten.`, { ms: 6000 });
+    if (this.settings.tutorialDone) {
+      this.toasts.show(`Willkommen in ${state.countries[playerId].name}. Drücken Sie die Leertaste, um die Zeit zu starten.`, { ms: 6000 });
+    } else {
+      // first game: start the guided tour once the game screen has rendered
+      requestAnimationFrame(() => requestAnimationFrame(() => this.tutorial.start()));
+    }
+  }
+
+  /** Used by tutorial steps to show a specific panel / country. */
+  setTutorialLayout({ panel = null, select = null }) {
+    this.activePanel = panel;
+    this.selected = select;
+    this.map.setSelected(select);
+    this.mark('drawer', 'nav', 'info');
+  }
+
+  onTutorialFinished() {
+    this.updateSetting('tutorialDone', true);
+    this.toasts.show('Viel Erfolg! Starten Sie die Zeit mit der Leertaste.', { tone: 'good', ms: 5000 });
   }
 
   // --------------------------------------------------------------- render
@@ -156,7 +176,7 @@ export class UIManager {
     const frame = (now) => {
       const elapsed = now - last;
       last = now;
-      if (this.mode === 'game') {
+      if (this.mode === 'game' && !this.tutorial.active) {
         try {
           this.session.update(elapsed);
         } catch (err) {
@@ -413,6 +433,10 @@ export class UIManager {
         if (await this.confirm('Neues Spiel beginnen? Nicht gespeicherter Fortschritt geht verloren.')) this.enterSetup();
       },
       startGame: (ds) => this.startNewGame(ds.id),
+      startTutorial: () => {
+        this.menu.close();
+        this.tutorial.start();
+      },
     };
   }
 
@@ -487,6 +511,7 @@ export class UIManager {
   }
 
   onKey(ev) {
+    if (this.tutorial.handleKey(ev)) return;
     const tag = ev.target.tagName;
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || ev.ctrlKey || ev.metaKey || ev.altKey) return;
     if (this.modals.isOpen) return; // Escape handled by the modal manager

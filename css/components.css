@@ -1759,3 +1759,87 @@ body.is-setup .map-modes {
     transform: translateY(8px);
   }
 }
+
+/* ---------- Tutorial ---------- */
+#tutorial-root {
+  position: fixed;
+  inset: 0;
+  z-index: 70; /* above panels and modals, toasts stay readable */
+}
+
+#tutorial-root[hidden] {
+  display: none;
+}
+
+.tut-spot {
+  position: fixed;
+  border: 2px solid var(--brass-bright);
+  border-radius: var(--radius);
+  box-shadow: 0 0 0 9999px rgba(4, 8, 12, 0.72), 0 0 24px rgba(240, 198, 110, 0.45);
+  transition: left 0.25s var(--ease), top 0.25s var(--ease), width 0.25s var(--ease), height 0.25s var(--ease);
+  pointer-events: none;
+}
+
+.tut-spot.is-center {
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  border: 0;
+  box-shadow: 0 0 0 9999px rgba(4, 8, 12, 0.72);
+}
+
+.tut-bubble {
+  position: fixed;
+  width: min(360px, calc(100vw - 24px));
+  padding: 16px 16px 12px;
+  border: 1px solid var(--brass);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  animation: rise 0.2s var(--ease);
+}
+
+.tut-bubble h3 {
+  font-size: 20px;
+  color: var(--brass-bright);
+  margin-bottom: 6px;
+}
+
+.tut-bubble p {
+  margin: 0 0 14px;
+  line-height: 1.55;
+}
+
+.tut-progress {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.tut-progress i {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--line);
+}
+
+.tut-progress i.on {
+  background: var(--brass);
+}
+
+.tut-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tut-spacer {
+  flex: 1;
+}
+
+.tut-skip {
+  border-color: transparent;
+  background: none;
+  color: var(--muted);
+}

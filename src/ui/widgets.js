@@ -54,8 +54,8 @@ export function opinionBar(opinion) {
   return `<div class="opinion-bar" role="meter" aria-valuenow="${Math.round(v)}" aria-valuemin="-100" aria-valuemax="100"><span class="${v < 0 ? 'neg' : 'pos'}" style="left:${left}%;width:${width}%"></span><i></i></div>`;
 }
 
-export function section(title, body, { extra = '' } = {}) {
-  return `<section class="card"><header class="card-head"><h3>${title}</h3>${extra}</header>${body}</section>`;
+export function section(title, body, { extra = '', tut = '' } = {}) {
+  return `<section class="card"${tut ? ` data-tut="${tut}"` : ''}><header class="card-head"><h3>${title}</h3>${extra}</header>${body}</section>`;
 }
 
 export function slider({ cmd, value, min, max, step = 0.5, label, display, tip = '' }) {

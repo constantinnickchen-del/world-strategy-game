@@ -90,6 +90,7 @@ export class InfoPanel {
            ${cancels}
            ${cmdButton(ui, embargoOut ? 'Embargo aufheben' : 'Handelsembargo verhängen', { type: 'setEmbargo', targetId: id, active: !embargoOut }, { cls: embargoOut ? '' : 'btn-danger', confirm: embargoOut ? '' : `Handelsembargo gegen ${c.name} verhängen? Der Handel wird vollständig unterbrochen und die Beziehungen leiden.` })}
          </div>`,
+        { tut: 'diplomacy' },
       );
     } else if (isPlayer) {
       diplomacy = section(

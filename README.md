@@ -22,9 +22,9 @@ Alternativ funktioniert jeder statische Server (z. B. `python3 -m http.server`).
 | Geschwindigkeit | `1` `2` `3`, `+` / `−` |
 | Panels | Navigation links oder `Q W E R T Z U I O` |
 | Karte | Mausrad/Pinch = Zoom, Ziehen = Verschieben, Klick = Land auswählen, Doppelklick = Zoom |
-| Menü (Speichern, Laden, Einstellungen) | `☰` oder `Esc` |
+| Menü (Speichern, Laden, Einstellungen, Einführung) | `☰` oder `Esc` |
 
-Fast jeder Wert hat einen Tooltip, der erklärt, *warum* er so ist (z. B. Zusammensetzung von Zustimmung, Stabilität und Haushalt).
+Beim ersten Spiel führt eine kurze Einführung durch die Oberfläche (später erneut über ☰ → Spiel). Fast jeder Wert hat einen Tooltip, der erklärt, *warum* er so ist (z. B. Zusammensetzung von Zustimmung, Stabilität und Haushalt).
 
 ## Was bereits funktioniert
 

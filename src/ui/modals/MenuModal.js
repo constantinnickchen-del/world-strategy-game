@@ -115,6 +115,7 @@ export class MenuModal {
         <div class="btn-col">
           <button class="btn btn-primary" data-modal-close>Weiterspielen</button>
           <button class="btn" data-action="quickSave">Schnellspeichern</button>
+          <button class="btn" data-action="startTutorial">Einführung erneut ansehen</button>
           <button class="btn btn-danger" data-action="newGame">Neues Spiel beginnen</button>
         </div>
         <p class="muted small">World Strategy ${GAME_VERSION}</p>`;
