@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Zero-dependency static file server for local development.
- *   node tools/serve.mjs [port=8080]
+ *   node tools/serve.mjs [port=8301]
  * ES modules require http(s) – opening index.html via file:// does not work.
  */
 import http from 'node:http';
@@ -10,7 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.argv[2] ?? process.env.PORT ?? 8080);
+const PORT = Number(process.argv[2] ?? process.env.PORT ?? 8301);
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',

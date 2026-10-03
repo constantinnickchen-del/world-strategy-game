@@ -9,7 +9,7 @@ Sie übernehmen die Regierung eines realen Landes (194 Staaten, Startjahr 2020) 
 ES-Module funktionieren nicht über `file://`, daher wird ein lokaler Webserver benötigt:
 
 ```bash
-npm start            # startet http://localhost:8080 (Node ≥ 20, keine Installation nötig)
+npm start            # startet http://localhost:8301 (Node ≥ 20, keine Installation nötig)
 ```
 
 Alternativ funktioniert jeder statische Server (z. B. `python3 -m http.server`).
