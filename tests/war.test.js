@@ -544,3 +544,16 @@ test('a strong attacker takes regions within weeks and can conquer a small state
   assert.equal(s.wars[0].status, 'ended');
   assert.ok(s.countries.SVK.regionIds.length === 0 || s.countries.GRC.regionIds.some((r) => r.startsWith('SK')), 'Slovak territory gained');
 });
+
+test('military power reflects soldiers and recovers in peacetime', async () => {
+  const s = newState({ playerId: 'GRC', seed: 'mp' });
+  const order = ['USA', 'CHN', 'RUS', 'IND'].map((id) => s.countries[id].military.power);
+  assert.ok(order[0] > order[1] && order[1] > order[2] && order[2] > order[3], 'great powers in a plausible order');
+  const c = s.countries.GRC;
+  assert.ok(c.military.landPower * 35 > c.military.power * 0.3, 'the army is a large part of the military power');
+  // supply left at zero after a war recovers in peacetime
+  for (const u of c.military.units) u.supply = 0;
+  simulateDays(s, 62);
+  const avg = c.military.units.filter((u) => u.status === 'active').reduce((x, u) => x + u.supply, 0) / c.military.units.filter((u) => u.status === 'active').length;
+  assert.ok(avg > 0.8, `supply recovered (${avg.toFixed(2)})`);
+});

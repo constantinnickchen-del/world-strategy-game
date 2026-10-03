@@ -12,10 +12,16 @@ export function personnelOf(u) {
   return Math.round(UNIT_TYPES[u.type].personnel * u.strength);
 }
 
-/** Overall effectiveness multiplier 0..~1.5 */
+/**
+ * Overall effectiveness multiplier 0..~1.3. Soldiers and equipment are the
+ * base; readiness, supply, morale and experience modify it moderately, so
+ * a large, equipped army is strong even when not every value is perfect.
+ */
 export function effectiveness(u) {
-  if (u.status !== 'active') return u.status === 'reserve' ? 0.25 * u.strength * (0.3 + 0.7 * u.equip) : 0;
-  return u.strength * (0.3 + 0.7 * u.equip) * (0.4 + 0.6 * u.readiness) * (0.35 + 0.65 * u.supply) * (0.5 + 0.5 * u.morale) * (1 + 0.5 * u.experience);
+  const base = u.strength * (0.3 + 0.7 * u.equip);
+  if (u.status === 'reserve') return 0.25 * base;
+  if (u.status === 'training') return 0.2 * base; // recruits can already defend their region a little
+  return base * (0.55 + 0.45 * u.readiness) * (0.5 + 0.5 * u.supply) * (0.75 + 0.25 * u.morale) * (1 + 0.3 * u.experience);
 }
 
 export function techMultiplier(c) {

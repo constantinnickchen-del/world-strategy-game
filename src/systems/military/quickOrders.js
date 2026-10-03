@@ -281,3 +281,19 @@ export function equipmentStatus(c) {
 export function restockPlan(state, c, id, quantity) {
   return sourceFor(state, c, procurementOffers(state, c.id), 'equipment', id, Math.max(1, Math.ceil(quantity)));
 }
+
+/** What limits the army's fighting value: averages of the active formations plus recruits in training. */
+export function armyCondition(c) {
+  const active = c.military.units.filter((u) => u.status === 'active');
+  const avg = (f) => (active.length ? active.reduce((s, u) => s + f(u), 0) / active.length : 0);
+  const training = c.military.units.filter((u) => u.status === 'training').length;
+  const spares = c.military.lastSparesFill ?? 1;
+  const funding = c.military.spending?.funding ?? 1;
+  const items = [
+    { id: 'equip', label: 'Ausrüstung', value: avg((u) => u.equip), fix: 'Fehlende Ausrüstung im Reiter „Lager“ nachbestellen (Engpass beachten).' },
+    { id: 'readiness', label: 'Einsatzbereitschaft', value: avg((u) => u.readiness), fix: funding < 0.99 ? 'Das Verteidigungsbudget deckt den Unterhalt nicht – Budget erhöhen.' : spares < 0.9 ? 'Ersatzteile fehlen – in der Munitionsfabrik produzieren lassen.' : 'Steigt mit gedecktem Unterhalt und Ersatzteilen von selbst.' },
+    { id: 'supply', label: 'Versorgung', value: avg((u) => u.supply), fix: 'Verpflegung, Treibstoff und Munition fehlen – Verteidigungsbudget erhöhen; eingekesselte Verbände befreien.' },
+    { id: 'morale', label: 'Moral', value: avg((u) => u.morale), fix: 'Erholt sich in Ruhephasen; Niederlagen senken sie.' },
+  ];
+  return { items, training, active: active.length };
+}

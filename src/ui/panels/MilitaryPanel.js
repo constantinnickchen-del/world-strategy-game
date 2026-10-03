@@ -26,7 +26,7 @@ import { formatBn, formatNumber, formatPopulation, formatPrice, esc } from '../.
 import { formatDateDE } from '../../core/calendar.js';
 import { section, stat, slider, cmdButton, actionButton, attr, meter, tipAttr, flag } from '../widgets.js';
 import { countryLink } from '../components/InfoPanel.js';
-import { QUICK_ORDERS, planQuickOrder, forceSummary, equipmentStatus, restockPlan } from '../../systems/military/quickOrders.js';
+import { QUICK_ORDERS, planQuickOrder, forceSummary, equipmentStatus, restockPlan, armyCondition } from '../../systems/military/quickOrders.js';
 
 export const MILITARY_TABS = [
   ['quick', 'Aufrüsten'],
@@ -93,6 +93,15 @@ function quick(ui) {
       ${big('Schiffe', formatNumber(f.ships), `${f.warships} Kriegsschiffe, ${f.submarines} U-Boote, ${f.carriers} Flugzeugträger.`)}
       ${big('Weltrang', `#${ui.ranks().military[c.id] ?? '–'}`, `Militärstärke ${formatNumber(m.power)}`)}
     </div>`;
+  const cond = armyCondition(c);
+  const condition = `<div class="army-condition">
+      <p class="small"><b>Zustand des Heeres</b> – die Militärstärke ergibt sich aus Soldaten und Ausrüstung, abgeschwächt durch diese Werte:</p>
+      <div class="cond-grid">${cond.items
+        .map((it) => `<div class="cond-item${it.value < 0.6 ? ' is-low' : ''}"${tipAttr(`<b>${esc(it.label)}: ${pct(it.value)}</b><br>${esc(it.fix)}`)}><span class="small">${it.label}</span>${meter(it.value * 100, { tone: it.value >= 0.75 ? 'good' : it.value >= 0.5 ? 'brass' : 'bad' })}<span class="num small">${pct(it.value)}</span></div>`)
+        .join('')}</div>
+      ${cond.items.filter((it) => it.value < 0.6).map((it) => `<p class="small bad">⚠ ${esc(it.label)} niedrig: ${esc(it.fix)}</p>`).join('')}
+      ${cond.training ? `<p class="small muted">${cond.training} Verband/Verbände in Ausbildung zählen erst nach der Ausbildung voll.</p>` : ''}
+    </div>`;
   const groups = ['Heer', 'Luftwaffe', 'Marine'].map((g) => {
     const cards = QUICK_ORDERS.filter((o) => o.group === g)
       .map((o) => {
@@ -119,7 +128,7 @@ function quick(ui) {
   for (const l of m.production) pending.push(`🏭 ${esc(itemDef(l.kind, l.item).name)} – ${formatNumber(l.done)} von ${formatNumber(l.quantity)} fertig${l.blocked ? ` <span class="bad">(${esc(l.blocked)})</span>` : ''}`);
   for (const ct of m.contracts.filter((x) => x.status !== 'completed')) pending.push(`🚢 ${esc(itemDef(ct.kind, ct.item).name)} – ${formatNumber(ct.delivered)} von ${formatNumber(ct.quantity)} geliefert${ct.status === 'suspended' ? ' <span class="bad">(Lieferstopp)</span>' : state.time.day < ct.firstDelivery ? `, erste Lieferung ${formatDateDE(ct.firstDelivery)}` : ''}`);
   return `
-    ${section('Ihre Streitkräfte', forces, { tut: 'military-dash' })}
+    ${section('Ihre Streitkräfte', forces + condition, { tut: 'military-dash' })}
     <div class="howto small">
       <b>So einfach geht's:</b> Wählen Sie unten, was Sie brauchen, und klicken Sie auf <b>Bestellen</b>. Das Spiel kümmert sich um alles:
       Soldaten ausbilden, fehlende Ausrüstung in eigenen Fabriken bauen oder im Ausland kaufen. Bezahlt wird aus dem Verteidigungshaushalt.

@@ -37,6 +37,8 @@ export function stepMaintenance(state, c, funding) {
   for (const u of m.units) {
     const t = u.status === 'reserve' ? Math.min(0.35, target) : target;
     u.readiness = clamp(u.readiness + (t - u.readiness) * 0.15, 0.05, 1);
+    // in peacetime the depots supply every formation (in war the daily supply model takes over)
+    if (!m.atWar && m.stock.rations > 0) u.supply = clamp(u.supply + (1 - u.supply) * 0.7, 0, 1);
     if (!u.inCombat) {
       u.morale = clamp(u.morale + (0.8 - u.morale) * 0.1, 0, 1);
       u.org = Math.min(1, u.org + 0.25);

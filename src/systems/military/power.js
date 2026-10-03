@@ -7,6 +7,10 @@ import { AIRCRAFT_BY_ID } from '../../data/military/aircraft.js';
 import { SHIP_CLASSES } from '../../data/military/navy.js';
 import { effectiveness, techMultiplier, personnelOf } from './units.js';
 
+export const LAND_WEIGHT = 35;
+export const AIR_WEIGHT = 0.25;
+export const NAVAL_WEIGHT = 3;
+
 export function landPower(c) {
   let p = 0;
   for (const u of c.military.units) {
@@ -58,6 +62,7 @@ export function refreshPower(c) {
   m.landPower = landPower(c);
   m.airPower = airPowerOf(c);
   m.navalPower = navalPowerOf(c);
-  m.power = m.landPower + m.airPower * 0.25 + m.navalPower * 0.6;
+  // weights put army, air force and navy on a comparable scale (a brigade ≈ several hundred points)
+  m.power = m.landPower * LAND_WEIGHT + m.airPower * AIR_WEIGHT + m.navalPower * NAVAL_WEIGHT;
   return m.power;
 }
