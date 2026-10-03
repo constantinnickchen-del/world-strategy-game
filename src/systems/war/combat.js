@@ -333,6 +333,10 @@ export function stepWarDay(state, war, ctx) {
     }
   }
   war.score = Math.round(computeWarScore(state, war) * 10) / 10;
+  // short score history for the war outlook (every 10 days, last 360 days)
+  if ((state.time.day - war.startDay) % 10 === 0) {
+    war.history = [...(war.history ?? []), [state.time.day, war.score]].slice(-36);
+  }
 }
 
 /** Daily supply, attrition and exhaustion for one country at war. */

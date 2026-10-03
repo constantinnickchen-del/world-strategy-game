@@ -22,6 +22,8 @@ Alternativ funktioniert jeder statische Server (z. B. `python3 -m http.server`).
 | Geschwindigkeit | `1` `2` `3` `4` (4 = Maximal, 90 Tage/s), `+` / `−` |
 | Panels | Navigation links oder `Q W E R T Z U K I O` (`U` Militär, `K` Kriege) |
 | Karte | Mausrad/Pinch = Zoom, Ziehen = Verschieben, Klick = Region + Land auswählen, Doppelklick = Zoom |
+| Aufrüsten (einfach) | Militär → „Aufrüsten“: Infanterie, Panzer, Artillerie, Flugabwehr, Kampfjets, Bomber, Drohnen, Kriegsschiffe, U-Boote mit einem Klick bestellen – Ausbildung, Produktion oder Kauf im Ausland erledigt das Spiel |
+| Krieg führen (einfach) | Kriegsübersicht ⚔: Lagebild (wer gewinnt, geschätzte Dauer, Soldaten/Panzer/Flugzeuge/Schiffe im Vergleich) und Strategie des Generalstabs: Angreifen, Ausgewogen, Verteidigen |
 | Truppen verlegen / angreifen | „Verlegen“ (Militär → Heer oder Regionspanel), dann Zielregion anklicken; feindliche Nachbarregion = Angriff. `Esc` bricht ab |
 | Krieg erklären | Land oder Region anklicken → „Krieg erklären…“ (Kriegsziele, Kräfteverhältnis, Folgen) |
 | Menü (Speichern, Laden, Einstellungen, Einführung) | `☰` oder `Esc` |

@@ -26,8 +26,10 @@ import { formatBn, formatNumber, formatPopulation, formatPrice, esc } from '../.
 import { formatDateDE } from '../../core/calendar.js';
 import { section, stat, slider, cmdButton, actionButton, attr, meter, tipAttr, flag } from '../widgets.js';
 import { countryLink } from '../components/InfoPanel.js';
+import { QUICK_ORDERS, planQuickOrder, forceSummary } from '../../systems/military/quickOrders.js';
 
 export const MILITARY_TABS = [
+  ['quick', 'Aufrüsten'],
   ['overview', 'Übersicht'],
   ['army', 'Heer'],
   ['air', 'Luftwaffe'],
@@ -62,6 +64,72 @@ function stockDays(c, id) {
 
 // ------------------------------------------------------------------- tabs
 
+/** What the player already has, for each simple order. */
+function ownedFor(c, order, f) {
+  if (order.unitType === 'armored') return `${formatNumber(f.tanks)} Panzer`;
+  if (order.unitType === 'artillery') return `${formatNumber(f.guns)} Geschütze`;
+  if (order.unitType) {
+    const n = c.military.units.filter((u) => u.type === order.unitType && u.status !== 'reserve').length;
+    return `${n} Verbände`;
+  }
+  if (order.id === 'fighters') return `${formatNumber(f.fighters)} Kampfjets`;
+  if (order.id === 'bombers') return `${formatNumber(f.bombers)} Bomber`;
+  if (order.id === 'drones') return `${formatNumber(f.drones)} Drohnen`;
+  if (order.id === 'warship') return `${formatNumber(f.warships)} Kriegsschiffe`;
+  return `${formatNumber(f.submarines)} U-Boote`;
+}
+
+function quick(ui) {
+  const state = ui.session.state;
+  const c = ui.session.player;
+  const m = c.military;
+  const f = forceSummary(c);
+  const big = (label, value, tip) => `<div class="big-stat"${tipAttr(tip)}><span class="big-stat-value num">${value}</span><span class="big-stat-label">${label}</span></div>`;
+  const forces = `<div class="big-stats">
+      ${big('Soldaten', formatPopulation(f.soldiers), `Aktive Soldaten in ${f.units} einsatzbereiten Verbänden. Dazu ${formatPopulation(f.reserve)} Reservisten.`)}
+      ${big('Panzer', formatNumber(f.tanks), 'Kampfpanzer in den Verbänden und im Lager.')}
+      ${big('Geschütze', formatNumber(f.guns), 'Artilleriesysteme in den Verbänden und im Lager.')}
+      ${big('Flugzeuge', formatNumber(f.aircraft), `${f.fighters} Kampfjets, ${f.bombers} Bomber, ${f.drones} Drohnen, Rest Transport/Aufklärung.`)}
+      ${big('Schiffe', formatNumber(f.ships), `${f.warships} Kriegsschiffe, ${f.submarines} U-Boote, ${f.carriers} Flugzeugträger.`)}
+      ${big('Weltrang', `#${ui.ranks().military[c.id] ?? '–'}`, `Militärstärke ${formatNumber(m.power)}`)}
+    </div>`;
+  const groups = ['Heer', 'Luftwaffe', 'Marine'].map((g) => {
+    const cards = QUICK_ORDERS.filter((o) => o.group === g)
+      .map((o) => {
+        const plan = planQuickOrder(state, c, o.id);
+        const body = plan.error
+          ? `<p class="small bad">${esc(plan.error)}</p>`
+          : `<p class="order-gives"><b>${esc(plan.gives)}</b></p>
+             <div class="order-facts"><span${tipAttr('Wird aus dem Verteidigungshaushalt bezahlt (Käufe: 15 % Anzahlung sofort).')}>💰 ${formatBn(plan.cost)}</span><span>⏱ ca. ${plan.months} Mon.</span></div>
+             <p class="small muted">${plan.sources.map(esc).join(' · ')}</p>
+             ${plan.warning ? `<p class="small bad">${esc(plan.warning)}</p>` : ''}`;
+        return `<div class="order-card">
+            <header><span class="order-icon" aria-hidden="true">${o.icon}</span><b>${o.name}</b><span class="small muted">${ownedFor(c, o, f)}</span></header>
+            <p class="small">${esc(o.role)}</p>
+            ${body}
+            ${cmdButton(ui, 'Bestellen', { type: 'quickOrder', order: o.id }, { cls: 'btn-primary' })}
+          </div>`;
+      })
+      .join('');
+    return section(g, `<div class="order-grid">${cards}</div>`);
+  });
+  // what is on its way
+  const pending = [];
+  for (const u of m.units.filter((x) => x.status === 'training')) pending.push(`${UNIT_TYPES[u.type].icon} ${esc(unitLabel(u))} – einsatzbereit ab ${formatDateDE(u.trainingUntil)}`);
+  for (const l of m.production) pending.push(`🏭 ${esc(itemDef(l.kind, l.item).name)} – ${formatNumber(l.done)} von ${formatNumber(l.quantity)} fertig${l.blocked ? ` <span class="bad">(${esc(l.blocked)})</span>` : ''}`);
+  for (const ct of m.contracts.filter((x) => x.status !== 'completed')) pending.push(`🚢 ${esc(itemDef(ct.kind, ct.item).name)} – ${formatNumber(ct.delivered)} von ${formatNumber(ct.quantity)} geliefert${ct.status === 'suspended' ? ' <span class="bad">(Lieferstopp)</span>' : state.time.day < ct.firstDelivery ? `, erste Lieferung ${formatDateDE(ct.firstDelivery)}` : ''}`);
+  return `
+    ${section('Ihre Streitkräfte', forces, { tut: 'military-dash' })}
+    <div class="howto small">
+      <b>So einfach geht's:</b> Wählen Sie unten, was Sie brauchen, und klicken Sie auf <b>Bestellen</b>. Das Spiel kümmert sich um alles:
+      Soldaten ausbilden, fehlende Ausrüstung in eigenen Fabriken bauen oder im Ausland kaufen. Bezahlt wird aus dem Verteidigungshaushalt.
+      Im Krieg führt der Generalstab Ihre Truppen automatisch – Sie wählen in der Kriegsübersicht ⚔ nur die Strategie.
+    </div>
+    ${groups.join('')}
+    ${section(`Unterwegs (${pending.length})`, pending.length ? `<ul class="list pending-list">${pending.map((p) => `<li>${p}</li>`).join('')}</ul>` : '<p class="muted small">Nichts in Arbeit.</p>')}
+    <p class="muted small">Für Profis: In den Reitern Heer, Produktion, Beschaffung und Anlagen lässt sich alles im Detail steuern.</p>`;
+}
+
 function overview(ui) {
   const state = ui.session.state;
   const c = ui.session.player;
@@ -92,7 +160,7 @@ function overview(ui) {
       .join('')}</ul>`;
 
   return `
-    <div class="dash-grid" data-tut="military-dash">
+    <div class="dash-grid">
       ${dash('HEER', row('Verbände aktiv', `${active.length} / ${units.length}`) + row('Personal aktiv', formatPopulation(m.activePersonnel ?? 0)) + row('Einsatzbereitschaft', pct(avg(active, (u) => u.readiness))) + row('Ausrüstung', pct(avg(active, (u) => u.equip))) + row('Landstärke', formatNumber(m.landPower)), 'army')}
       ${dash('LUFTWAFFE', row('Flugzeuge', formatNumber(airTotal)) + row('Jäger / Bomber', `${aircraftCount(c, 'fighter') + aircraftCount(c, 'interceptor')} / ${aircraftCount(c, 'bomber')}`) + row('Drohnen', formatNumber(aircraftCount(c, 'drone'))) + row('Basiskapazität', `${formatNumber(airTotal)} / ${formatNumber(airCap)}`, airTotal > airCap ? 'bad' : '') + row('Luftstärke', formatNumber(m.airPower)), 'air')}
       ${dash('MARINE', row('Schiffe', formatNumber(ships)) + row('Flotten', m.fleets.length) + row('Träger / U-Boote', `${shipCount(c, 'carrier')} / ${shipCount(c, 'submarine')}`) + row('Hafenkapazität', `${ships} / ${navalCap}`, ships > navalCap ? 'bad' : '') + row('Seestärke', formatNumber(m.navalPower)), 'navy')}
@@ -386,13 +454,13 @@ function stock(ui) {
       ${isAtWar(ui.session.state, c.id) && m.supplyFill ? `<p class="small">Nachschub gestern: Treibstoff ${pct(m.supplyFill.fuel)}, Munition ${pct(m.supplyFill.ammunition)}, Verpflegung ${pct(m.supplyFill.rations)}</p>` : ''}`)}`;
 }
 
-const TAB_RENDER = { overview, army, air, navy, production, procurement, facilities, stock };
+const TAB_RENDER = { quick, overview, army, air, navy, production, procurement, facilities, stock };
 
 export const MilitaryPanel = {
   id: 'military',
   title: 'Militär',
   render(ui) {
-    const tab = TAB_RENDER[ui.militaryTab] ? ui.militaryTab : 'overview';
+    const tab = TAB_RENDER[ui.militaryTab] ? ui.militaryTab : 'quick';
     const tabs = `<div class="tab-row" role="tablist" data-tut="military-tabs">${MILITARY_TABS.map(([id, label]) => `<button class="tab-btn${id === tab ? ' is-active' : ''}" role="tab" aria-selected="${id === tab}" data-action="setMilitaryTab" data-tab="${id}">${label}</button>`).join('')}</div>`;
     return tabs + TAB_RENDER[tab](ui);
   },

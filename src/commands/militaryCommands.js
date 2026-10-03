@@ -8,11 +8,12 @@ import { SUPPLIER_BY_ID } from '../data/military/suppliers.js';
 import { STATIC_REGIONS } from '../state/worldIndex.js';
 import { newUnit } from '../state/militarySetup.js';
 import { unitLabel } from '../systems/military/units.js';
-import { setMobilization, mobilizablePopulation } from '../systems/military/manpower.js';
+import { setMobilization, mobilizablePopulation, recruitPlan, trainingCapacity } from '../systems/military/manpower.js';
 import { canProduce, itemDef } from '../systems/military/production.js';
 import { findOffer, signContract } from '../systems/military/procurement.js';
 import { constructionError, startConstruction } from '../systems/military/construction.js';
 import { refreshPower } from '../systems/military/power.js';
+import { planQuickOrder, QUICK_ORDER_BY_ID, hasHomePort } from '../systems/military/quickOrders.js';
 import { planMove, applyMove } from '../systems/war/movement.js';
 import {
   declareWarError, declareWar, sideOf, otherSide, peaceTermsError, evaluatePeace, concludePeace,
@@ -59,19 +60,20 @@ export const MILITARY_COMMANDS = {
       if (!r || r.owner !== countryId || r.controller !== countryId) return 'Nur in eigenen, kontrollierten Regionen.';
       const fromReserve = c.military.reserve >= t.personnel;
       if (!fromReserve && mobilizablePopulation(c) < t.personnel) return 'Nicht genug wehrfähige Bevölkerung.';
-      if (!fromReserve && (c.military.trainingLeft ?? 0) < t.personnel) return `Ausbildungskapazität für diesen Monat erschöpft (${Math.round(c.military.trainingLeft ?? 0)} Plätze).`;
+      if (!fromReserve && (c.military.trainingLeft ?? trainingCapacity(c)) < recruitPlan(c, unitType).places) return `Ausbildungsplätze für diesen Monat belegt (${Math.round(c.military.trainingLeft ?? 0)} frei) – nächsten Monat wieder möglich oder Mobilmachung anordnen.`;
       return null;
     },
     execute(state, { countryId, unitType, regionId }) {
       const c = state.countries[countryId];
       const t = UNIT_TYPES[unitType];
       const fromReserve = c.military.reserve >= t.personnel;
+      const plan = recruitPlan(c, unitType);
       if (fromReserve) c.military.reserve -= t.personnel;
-      else c.military.trainingLeft -= t.personnel;
+      else c.military.trainingLeft = (c.military.trainingLeft ?? trainingCapacity(c)) - plan.places;
       const u = newUnit(c, unitType, regionId, { status: 'training', equip: 0, readiness: 0.4, experience: fromReserve ? 0.1 : 0 });
-      u.trainingUntil = state.time.day + Math.round((fromReserve ? 1 : t.trainMonths) * 30.44);
+      u.trainingUntil = state.time.day + Math.round((fromReserve ? 1 : plan.months) * 30.44);
       c.military.units.push(u);
-      return { message: `${unitLabel(u)} wird aufgestellt (${fromReserve ? 'Reservisten, 1 Monat' : `Rekruten, ${t.trainMonths} Monate`}). Ausrüstung kommt aus dem Lager.` };
+      return { message: `${unitLabel(u)} wird aufgestellt (${fromReserve ? 'Reservisten, 1 Monat' : `Rekruten, ${plan.months} Monate`}). Ausrüstung kommt aus dem Lager.` };
     },
   },
 
@@ -119,6 +121,37 @@ export const MILITARY_COMMANDS = {
     },
     execute(state, { countryId, unitId }) {
       unitOf(state.countries[countryId], unitId).manual = false;
+    },
+  },
+
+  /** Simple order: turns e.g. "Panzer" into raise + produce/buy steps (see quickOrders.js). */
+  quickOrder: {
+    validate(state, { countryId, order }) {
+      const plan = planQuickOrder(state, state.countries[countryId], order);
+      if (plan.error) return plan.error;
+      for (const step of plan.steps) {
+        const err = MILITARY_COMMANDS[step.type].validate(state, { ...step, countryId });
+        if (err) return err;
+      }
+      return null;
+    },
+    execute(state, { countryId, order }, ctx) {
+      const plan = planQuickOrder(state, state.countries[countryId], order);
+      for (const step of plan.steps) MILITARY_COMMANDS[step.type].execute(state, { ...step, countryId }, ctx);
+      return { message: `Bestellt: ${plan.gives} – ${formatBn(plan.cost)}, fertig in ca. ${plan.months} Monat${plan.months === 1 ? '' : 'en'}.`, order: QUICK_ORDER_BY_ID[order].name };
+    },
+  },
+
+  setFrontStance: {
+    validate(state, { stance }) {
+      return ['offensive', 'balanced', 'defensive'].includes(stance) ? null : 'Unbekannte Strategie.';
+    },
+    execute(state, { countryId, stance }) {
+      const m = state.countries[countryId].military;
+      m.stance = stance;
+      m.autoFront = true;
+      const text = { offensive: 'Offensive: Der Generalstab greift an, sobald er nicht deutlich unterlegen ist.', balanced: 'Ausgewogen: Angriffe nur mit klarer Überlegenheit.', defensive: 'Verteidigung: Front halten, nur eigene Gebiete werden zurückerobert.' };
+      return { message: text[stance] };
     },
   },
 
@@ -180,6 +213,7 @@ export const MILITARY_COMMANDS = {
       if (offer.refusal) return offer.refusal;
       if (!(Number.isInteger(quantity) && quantity > 0)) return 'Ungültige Menge.';
       if (quantity > offer.maxQuantity) return `Höchstens ${offer.maxQuantity} Stück pro Vertrag.`;
+      if (kind === 'ship' && !hasHomePort(state, state.countries[countryId])) return 'Kein Hafen – zuerst eine Marinebasis oder Werft bauen.';
       if (state.countries[countryId].military.contracts.filter((c) => c.status !== 'completed').length >= 12) return 'Höchstens 12 laufende Verträge.';
       return null;
     },

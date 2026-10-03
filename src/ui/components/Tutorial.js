@@ -94,8 +94,8 @@ export const TUTORIAL_STEPS = [
   {
     target: '[data-tut="military-dash"]',
     title: 'Militär',
-    text: 'Das Militär-Dashboard zeigt Heer, Luftwaffe, Marine, Rüstungsindustrie und Logistik – alles aus echten Verbänden, Flugzeugen, Schiffen und Lagern. Über die Reiter oben stellen Sie Verbände auf, geben Produktion in Auftrag, kaufen Rüstungsgüter im Ausland und bauen Stützpunkte.',
-    prepare: (ui) => ui.setTutorialLayout({ panel: 'military', select: null, militaryTab: 'overview' }),
+    text: 'Hier sehen Sie auf einen Blick, wie viele Soldaten, Panzer, Flugzeuge und Schiffe Sie haben. Darunter bestellen Sie mit <b>einem Klick</b> neue Truppen, Panzer, Kampfjets oder Schiffe – das Spiel bildet Soldaten aus, baut fehlende Ausrüstung oder kauft sie im Ausland. Kosten und Dauer stehen auf jeder Karte.',
+    prepare: (ui) => ui.setTutorialLayout({ panel: 'military', select: null, militaryTab: 'quick' }),
   },
   {
     target: '[data-tut="region"]',

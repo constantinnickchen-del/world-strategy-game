@@ -19,6 +19,7 @@ import { procurementOffers } from '../src/systems/military/procurement.js';
 import { STATIC_REGIONS } from '../src/state/worldIndex.js';
 import { newUnit } from '../src/state/militarySetup.js';
 import { hasEmbargo } from '../src/systems/diplomacy.js';
+import { warOutlook } from '../src/systems/war/outlook.js';
 
 const goal = (regionId) => ({ type: 'region', regionId });
 
@@ -345,4 +346,53 @@ test('12: AI vs AI over many years – wars start and end, the world stays consi
     else assert.ok(c.regionIds.includes(c.capitalRegion), `${id} capital is own territory`);
   }
   assert.ok(finite(s));
+});
+
+// ---------------------------------------------------------------- simple controls
+
+test('simple orders: one click raises troops, produces or buys aircraft and ships', () => {
+  const s = newState({ playerId: 'DEU', seed: 'q1' });
+  const deu = s.countries.DEU;
+  const units = deu.military.units.length;
+  const res = run(s, { type: 'quickOrder', countryId: 'DEU', order: 'armored' });
+  assert.equal(res.ok, true, res.error);
+  assert.equal(deu.military.units.length, units + 1, 'tank formation raised');
+  assert.ok(deu.military.production.some((l) => l.item === 'armor'), 'missing tanks are produced');
+  assert.equal(run(s, { type: 'quickOrder', countryId: 'DEU', order: 'fighters' }).ok, true);
+  assert.ok(deu.military.production.some((l) => l.kind === 'aircraft' && l.quantity === 10));
+  // a country without aircraft factories buys abroad
+  const k = newState({ playerId: 'POL', seed: 'q1' });
+  assert.equal(run(k, { type: 'quickOrder', countryId: 'POL', order: 'fighters' }).ok, true);
+  assert.equal(k.countries.POL.military.contracts.length, 1, 'fighters bought from a supplier');
+  // small countries can still raise a formation (it just trains longer)
+  const lux = newState({ playerId: 'LUX', seed: 'q1' });
+  assert.equal(run(lux, { type: 'quickOrder', countryId: 'LUX', order: 'infantry' }).ok, true);
+  assert.match(run(lux, { type: 'quickOrder', countryId: 'LUX', order: 'submarine' }).error, /Hafen/);
+});
+
+test('war outlook: verdict, estimated duration and force comparison follow the war', () => {
+  const s = newState({ playerId: 'RUS', seed: 'o1' });
+  assert.equal(run(s, { type: 'declareWar', countryId: 'RUS', targetId: 'UKR', goals: [goal('UA-14')] }).ok, true);
+  const war = activeWars(s)[0];
+  const early = warOutlook(s, war, 'attackers');
+  assert.equal(early.months, null, 'no estimate on day one');
+  assert.ok(early.own.soldiers > early.enemy.soldiers);
+  simulateDays(s, 90);
+  if (war.status === 'active') {
+    const later = warOutlook(s, war, 'attackers');
+    const mirror = warOutlook(s, war, 'defenders');
+    assert.ok(later.value > mirror.value, 'the stronger side is judged better');
+    assert.ok(later.months === null || (later.months >= 1 && later.months <= 60));
+    assert.ok(war.history.length >= 3, 'score history recorded');
+  }
+});
+
+test('front strategy: defensive general staff does not attack foreign regions', () => {
+  const s = newState({ playerId: 'RUS', seed: 'st' });
+  assert.equal(run(s, { type: 'declareWar', countryId: 'RUS', targetId: 'UKR', goals: [goal('UA-14')] }).ok, true);
+  assert.equal(run(s, { type: 'setFrontStance', countryId: 'RUS', stance: 'defensive' }).ok, true);
+  simulateDays(s, 40);
+  const attacking = s.countries.RUS.military.units.filter((u) => u.attacking && s.regions[u.target]?.owner !== 'RUS');
+  assert.equal(attacking.length, 0);
+  assert.ok(!Object.values(s.regions).some((r) => r.owner === 'UKR' && r.controller === 'RUS'), 'no conquests in defensive mode');
 });

@@ -72,7 +72,11 @@ export function runFrontAI(state, c, { onlyAutomatic = false } = {}) {
     })
     .sort((a, b) => b.priority - a.priority || a.defense - b.defense);
   const committed = new Set(units.filter((u) => u.attacking).map((u) => u.id));
+  // strategy chosen by the head of state (AI countries: balanced)
+  const stance = c.military.stance ?? 'balanced';
+  const ratioNeeded = stance === 'offensive' ? 0.95 : ATTACK_RATIO;
   for (const { t, defense } of targets) {
+    if (stance === 'defensive' && state.regions[t].owner !== c.id) continue; // only liberate own territory
     const adjacent = STATIC_REGIONS[t].neighbors.filter((n) => byRegion.has(n));
     const available = [];
     for (const n of adjacent) {
@@ -86,9 +90,9 @@ export function runFrontAI(state, c, { onlyAutomatic = false } = {}) {
     for (const u of available) {
       chosen.push(u);
       power += attackValue(u, c);
-      if (power > defense * ATTACK_RATIO * 1.5 + 5) break;
+      if (power > defense * ratioNeeded * 1.5 + 5) break;
     }
-    if (power >= defense * ATTACK_RATIO && chosen.length) {
+    if (power >= defense * ratioNeeded && chosen.length) {
       for (const u of chosen) {
         const plan = planMove(state, c, u, t);
         if (!plan.error) {

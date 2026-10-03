@@ -9,6 +9,57 @@ import { formatDateDE } from '../../core/calendar.js';
 import { formatBn, formatNumber, esc } from '../../util/format.js';
 import { section, cmdButton, actionButton, signClass, tipAttr, meter } from '../widgets.js';
 import { countryLink } from '../components/InfoPanel.js';
+import { warOutlook } from '../../systems/war/outlook.js';
+import { sideSummary } from '../../systems/military/quickOrders.js';
+
+/** Side-by-side force comparison with bars. */
+function comparison(a, b, labels = ['Ihre Seite', 'Gegner']) {
+  const rows = [
+    ['Soldaten', 'soldiers'],
+    ['Kampfverbände', 'units'],
+    ['Panzer', 'tanks'],
+    ['Geschütze', 'guns'],
+    ['Kampfjets', 'fighters'],
+    ['Flugzeuge gesamt', 'aircraft'],
+    ['Kriegsschiffe', 'warships'],
+    ['U-Boote', 'submarines'],
+    ['Militärstärke', 'power'],
+  ];
+  return `<table class="data-table compare-table"><thead><tr><th></th><th class="num">${labels[0]}</th><th></th><th class="num">${labels[1]}</th></tr></thead><tbody>${rows
+    .filter(([, k]) => (a[k] ?? 0) + (b[k] ?? 0) > 0)
+    .map(([label, k]) => {
+      const x = a[k] ?? 0;
+      const y = b[k] ?? 0;
+      const share = x + y > 0 ? (x / (x + y)) * 100 : 50;
+      return `<tr><td>${label}</td><td class="num ${x >= y ? 'good' : ''}">${formatNumber(x)}</td><td class="cmp-cell"><div class="cmp-track"><span style="width:${share.toFixed(1)}%"></span></div></td><td class="num ${y > x ? 'bad' : ''}">${formatNumber(y)}</td></tr>`;
+    })
+    .join('')}</tbody></table>`;
+}
+
+/** The player's situation in a war: verdict, estimated duration, forces. */
+function situation(ui, war, side) {
+  const o = warOutlook(ui.session.state, war, side);
+  const duration = o.months === null ? 'Noch zu früh für eine Schätzung' : o.months <= 1 ? 'Entscheidung steht kurz bevor' : `noch ca. ${o.months} Monate (Schätzung)`;
+  return `<div class="war-situation tone-${o.tone}">
+      <div class="war-verdict"><b>${o.verdict}</b><span class="small">${duration}</span></div>
+      <ul class="war-reasons">${o.reasons.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>
+    </div>
+    <h4 class="sub-head">Kräftevergleich</h4>
+    ${comparison(o.own, o.enemy)}`;
+}
+
+function stanceButtons(ui) {
+  const m = ui.session.player.military;
+  const cur = m.autoFront === false ? null : (m.stance ?? 'balanced');
+  const opts = [
+    ['offensive', 'Angreifen', 'Der Generalstab greift an, sobald er nicht deutlich unterlegen ist – schnellere Eroberungen, höhere Verluste.'],
+    ['balanced', 'Ausgewogen', 'Angriffe nur mit klarer Überlegenheit, sonst Front halten.'],
+    ['defensive', 'Verteidigen', 'Front halten und nur eigene besetzte Gebiete zurückerobern – geringe Verluste.'],
+  ];
+  return `<div class="stance-row"><span class="small">Strategie des Generalstabs:</span><div class="seg-row">${opts
+    .map(([id, label, tip]) => cmdButton(ui, label, { type: 'setFrontStance', stance: id }, { cls: cur === id ? 'btn-primary is-on' : '', tip }))
+    .join('')}</div></div>`;
+}
 
 function duration(state, war) {
   const days = (war.endDay ?? state.time.day) - war.startDay;
@@ -107,16 +158,21 @@ function warCard(ui, war) {
       <span class="num muted">${duration(state, war)}</span>
     </button>`;
   if (!open) {
-    return `<div class="war-card${side ? ' is-player' : ''}">${head}<div class="war-mini">${scoreBar(perspective)}<span class="num ${signClass(perspective)}">${Math.round(perspective)}</span></div></div>`;
+    const mini = side ? warOutlook(state, war, side) : null;
+    return `<div class="war-card${side ? ' is-player' : ''}">${head}<div class="war-mini">${scoreBar(perspective)}<span class="num ${signClass(perspective)}">${Math.round(perspective)}</span></div>${mini ? `<p class="small tone-${mini.tone} war-mini-verdict">${mini.verdict}</p>` : ''}</div>`;
   }
   const join = !side && war.status === 'active'
     ? `<div class="btn-row">${cmdButton(ui, `Für ${esc(state.countries[war.attackers[0]].name)} eintreten`, { type: 'joinWar', warId: war.id, side: 'attackers' }, { cls: 'btn-danger', confirm: `Dem ${war.name} auf Seite der Angreifer beitreten?` })}${cmdButton(ui, `Für ${esc(state.countries[war.defenders[0]].name)} eintreten`, { type: 'joinWar', warId: war.id, side: 'defenders' }, { cls: 'btn-danger', confirm: `Dem ${war.name} auf Seite der Verteidiger beitreten?` })}</div>`
     : '';
   const command = side
-    ? `<label class="check"${tipAttr('Der Generalstab verteilt Ihre nicht manuell geführten Verbände auf Front, Angriffe und Verteidigung. Manuell befohlene Verbände bleiben unter Ihrer Kontrolle.')}><input type="checkbox" data-action-change="setAutoFront"${ui.session.player.military.autoFront !== false ? ' checked' : ''}> Front automatisch durch den Generalstab führen</label>`
+    ? `${stanceButtons(ui)}<label class="check"${tipAttr('Der Generalstab verteilt Ihre nicht manuell geführten Verbände auf Front, Angriffe und Verteidigung. Manuell befohlene Verbände bleiben unter Ihrer Kontrolle.')}><input type="checkbox" data-action-change="setAutoFront"${ui.session.player.military.autoFront !== false ? ' checked' : ''}> Front automatisch durch den Generalstab führen</label>`
     : '';
+  const overviewBlock = side
+    ? situation(ui, war, side)
+    : `<h4 class="sub-head">Kräftevergleich</h4>${comparison(sideSummary(state, war.attackers), sideSummary(state, war.defenders), ['Angreifer', 'Verteidiger'])}`;
   return `<div class="war-card is-open${side ? ' is-player' : ''}">${head}
       <p class="small muted">Seit ${formatDateDE(war.startDay)} · Ziele: ${goals || '–'}</p>
+      ${overviewBlock}
       <div class="war-sides">
         <div><h4 class="sub-head">Angreifer</h4><ul class="list">${sideList(state, war, 'attackers')}</ul></div>
         <div><h4 class="sub-head">Verteidiger</h4><ul class="list">${sideList(state, war, 'defenders')}</ul></div>

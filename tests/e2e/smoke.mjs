@@ -198,12 +198,16 @@ try {
   console.log('Military & war');
   while (await page.locator('.event-option').count()) await page.locator('.event-option').first().click();
   await page.click('.nav-btn[data-panel="military"]');
-  for (const tab of ['army', 'air', 'navy', 'production', 'procurement', 'facilities', 'stock', 'overview']) {
+  for (const tab of ['quick', 'army', 'air', 'navy', 'production', 'procurement', 'facilities', 'stock', 'overview']) {
     await page.click(`#drawer .tab-btn[data-tab="${tab}"]`);
     await page.waitForSelector(`#drawer .tab-btn.is-active[data-tab="${tab}"]`);
-    if (tab === 'overview' || tab === 'army') await shot(`08-military-${tab}`);
+    if (tab === 'overview' || tab === 'army' || tab === 'quick') await shot(`08-military-${tab}`);
   }
   assert(true, 'all military tabs render');
+  await page.click('#drawer .tab-btn[data-tab="quick"]');
+  const fighters0 = await page.evaluate(() => window.worldStrategy.session.player.military.production.length + window.worldStrategy.session.player.military.contracts.length);
+  await page.locator('#drawer .order-card', { hasText: 'Kampfjets' }).locator('[data-cmd]').click();
+  assert((await page.evaluate(() => window.worldStrategy.session.player.military.production.length + window.worldStrategy.session.player.military.contracts.length)) === fighters0 + 1, 'one click orders fighter jets');
   await page.click('#drawer .tab-btn[data-tab="production"]');
   await page.selectOption('#drawer select[name="product"]', 'equipment:ammunition');
   await page.fill('#drawer input[name="quantity"]', '5000');
@@ -234,6 +238,8 @@ try {
   await page.waitForSelector('#drawer[data-panel="wars"]:not([hidden])');
   const declared = await page.evaluate(() => ({ speed: window.worldStrategy.session.clock.speed, kind: window.worldStrategy.session.lastInterrupt?.kind, wars: window.worldStrategy.session.state.wars.length }));
   assert(declared.speed === 0 && declared.kind === 'playerDeclared' && declared.wars >= 1, 'player war declaration pauses and opens the war room');
+  await page.waitForSelector('#drawer .war-situation .war-verdict');
+  assert(true, 'war room shows the outlook (verdict, duration, force comparison)');
   await page.click('.mode-btn[data-mode="war"]');
   await shot('10-war-room');
   // an AI war at maximum speed pauses on the day of the outbreak

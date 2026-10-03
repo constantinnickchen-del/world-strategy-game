@@ -21,7 +21,19 @@ export function mobilizablePopulation(c) {
 
 /** Monthly training capacity (recruits that can be turned into soldiers). */
 export function trainingCapacity(c) {
-  return Math.round(c.population * 0.00004 * (1 + 1.5 * c.military.mobilization));
+  return Math.round(c.population * 0.00025 * (1 + 1.5 * c.military.mobilization));
+}
+
+/**
+ * Training places a new formation occupies this month. Small countries whose
+ * monthly capacity is below the size of a formation can still raise one: it
+ * takes the whole capacity and trains correspondingly longer.
+ */
+export function recruitPlan(c, unitType) {
+  const t = UNIT_TYPES[unitType];
+  const cap = Math.max(1, trainingCapacity(c));
+  const places = Math.min(t.personnel, cap);
+  return { places, months: Math.ceil(t.trainMonths * Math.max(1, t.personnel / cap)) };
 }
 
 /** Economic and political side effects of the size of the armed forces. */

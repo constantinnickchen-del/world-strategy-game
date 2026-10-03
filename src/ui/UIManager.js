@@ -70,7 +70,7 @@ export class UIManager {
     this.selectedRegion = null;
     this.moveMode = null; // { unitIds } while the player picks a destination on the map
     this.moveTargetOk = false;
-    this.militaryTab = 'overview';
+    this.militaryTab = 'quick';
     this.procurementFilter = 'all';
     this.unitSelection = new Set();
     this.openWar = null;

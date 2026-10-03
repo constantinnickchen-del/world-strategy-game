@@ -35,8 +35,8 @@ export class TopBar {
       </div>
       <div class="top-stats topbar-game">
         ${this.statSlot('gdp', 'BIP')}
+        ${this.statSlot('treasury', 'Geld (Kasse)')}
         ${this.statSlot('growth', 'Wachstum')}
-        ${this.statSlot('treasury', 'Staatskasse')}
         ${this.statSlot('debt', 'Schulden')}
         ${this.statSlot('inflation', 'Inflation')}
         ${this.statSlot('unemployment', 'Arbeitslos.')}

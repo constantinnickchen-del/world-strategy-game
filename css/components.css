@@ -2342,3 +2342,179 @@ button.chip {
 .crisis-analysis .list li {
   flex-wrap: wrap;
 }
+
+/* ---------- simple military & war outlook ---------- */
+.big-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.big-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+}
+
+.big-stat-value {
+  font: 700 20px/1.1 var(--font-cond);
+  color: var(--brass-bright);
+}
+
+.big-stat-label {
+  font-size: 11.5px;
+  color: var(--ink-2);
+}
+
+.howto {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--brass);
+  background: rgba(200, 162, 90, 0.08);
+  border-radius: var(--radius-sm);
+}
+
+.order-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 8px;
+}
+
+.order-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+}
+
+.order-card header {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.order-card header .muted {
+  margin-left: auto;
+}
+
+.order-card p {
+  margin: 0;
+}
+
+.order-card .btn {
+  margin-top: auto;
+}
+
+.order-icon {
+  font-size: 16px;
+}
+
+.order-facts {
+  display: flex;
+  gap: 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pending-list li {
+  justify-content: flex-start;
+}
+
+.war-situation {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-left: 4px solid var(--warn);
+  border-radius: var(--radius-sm);
+  background: rgba(217, 164, 65, 0.08);
+}
+
+.war-situation.tone-good {
+  border-color: var(--good);
+  background: rgba(63, 167, 150, 0.1);
+}
+
+.war-situation.tone-bad {
+  border-color: var(--bad);
+  background: rgba(208, 101, 74, 0.1);
+}
+
+.war-verdict {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.war-verdict b {
+  font: 700 17px/1.2 var(--font-cond);
+  letter-spacing: 0.02em;
+}
+
+.war-situation.tone-good .war-verdict b {
+  color: var(--good);
+}
+
+.war-situation.tone-bad .war-verdict b {
+  color: #f0b4a4;
+}
+
+.war-situation.tone-warn .war-verdict b {
+  color: var(--warn);
+}
+
+.war-reasons {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+}
+
+.war-mini-verdict {
+  margin: 0;
+  padding: 0 10px 8px;
+}
+
+.tone-good {
+  color: var(--good);
+}
+
+.tone-bad {
+  color: #f0b4a4;
+}
+
+.tone-warn {
+  color: var(--warn);
+}
+
+.compare-table .cmp-cell {
+  width: 38%;
+}
+
+.cmp-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bad);
+  overflow: hidden;
+}
+
+.cmp-track span {
+  display: block;
+  height: 100%;
+  background: var(--good);
+}
+
+.stance-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
