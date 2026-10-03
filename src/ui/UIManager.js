@@ -604,6 +604,16 @@ export class UIManager {
         this.assistant.render();
       },
       assistantGo: (ds) => this.openPanel(ds.panel),
+      assistantOffer: (ds) => {
+        this.assistant.openOffer = ds.key;
+        this.assistant.render();
+      },
+      assistantAccept: (ds) => this.assistant.accept(ds.key),
+      assistantDecline: (ds) => {
+        this.assistant.declined.add(ds.key);
+        this.assistant.openOffer = null;
+        this.assistant.render();
+      },
       assistantOff: () => {
         this.updateSetting('assistant', false);
         this.toasts.show('Assistent ausgeschaltet – im Menü ☰ → Einstellungen wieder einschalten.', { ms: 4000 });

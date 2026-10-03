@@ -2647,3 +2647,32 @@ body.is-setup #assistant {
 #newsfeed:not([hidden]) ~ #assistant {
   bottom: 110px;
 }
+
+.assistant-tip .btn-row {
+  gap: 6px;
+}
+
+.assistant-offer {
+  width: 100%;
+  margin: 2px 0;
+  padding: 8px 10px;
+  border: 1px solid var(--brass-dim);
+  border-radius: var(--radius-sm);
+  background: rgba(200, 162, 90, 0.08);
+  font-size: 12.5px;
+}
+
+.assistant-offer p {
+  margin: 0 0 4px;
+}
+
+.assistant-offer ul {
+  margin: 0 0 6px;
+  padding-left: 18px;
+}
+
+.assistant-done {
+  margin: 0;
+  color: var(--good);
+  font-size: 12.5px;
+}

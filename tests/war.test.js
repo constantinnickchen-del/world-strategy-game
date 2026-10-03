@@ -428,3 +428,35 @@ test('assistant: names the cause of discontent and points to the fix', async () 
   assert.ok(tips.some((t) => t.action?.panel === 'research'));
   for (const t of tips) assert.ok(t.title && t.text);
 });
+
+test('assistant help offers: budget repair really reduces the deficit, tax relief targets the cause', async () => {
+  const { assistantTips } = await import('../src/systems/assistant.js');
+  const { balanceBudgetFix } = await import('../src/systems/assistantFixes.js');
+  const { updateBudget } = await import('../src/systems/economy.js');
+  const s = newState({ playerId: 'DEU', seed: 'f1' });
+  const deu = s.countries.DEU;
+  // create a deficit: taxes far below normal, more spending
+  deu.economy.taxRate -= 0.06;
+  deu.budget.infrastructure += 0.02;
+  updateBudget(deu, { book: false });
+  const before = deu.economy.lastBalance;
+  assert.ok(before < 0, 'deficit created');
+  const fix = balanceBudgetFix(deu);
+  assert.ok(fix && fix.commands.length >= 2, 'tax increase and cuts proposed');
+  for (const cmd of fix.commands) assert.equal(run(s, { ...cmd, countryId: 'DEU' }).ok, true, JSON.stringify(cmd));
+  updateBudget(deu, { book: false });
+  assert.ok(deu.economy.lastBalance > before + deu.economy.gdp * 0.002, `balance improved (${before.toFixed(2)} → ${deu.economy.lastBalance.toFixed(2)})`);
+  // discontent caused by a tax hike: the offer lowers taxes
+  const t = newState({ playerId: 'DEU', seed: 'f2' });
+  t.countries.DEU.politics.approval = 25;
+  t.countries.DEU.economy.taxRate = t.countries.DEU.politics.taxTolerance + 0.12;
+  const tip = assistantTips(t, t.countries.DEU)[0];
+  assert.equal(tip.fix.commands[0].type, 'setTaxRate');
+  assert.ok(tip.fix.commands[0].value < t.countries.DEU.economy.taxRate);
+  // research offer starts a project
+  const r = newState({ playerId: 'DEU', seed: 'f3' });
+  r.countries.DEU.technology.current = null;
+  const rt = assistantTips(r, r.countries.DEU).find((x) => x.fix?.commands[0].type === 'setResearch');
+  assert.equal(run(r, { ...rt.fix.commands[0], countryId: 'DEU' }).ok, true);
+  assert.ok(r.countries.DEU.technology.current);
+});

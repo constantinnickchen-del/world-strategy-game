@@ -107,6 +107,15 @@ try {
   console.log('Assistant & difficulty');
   await page.waitForSelector('#assistant:not([hidden]) .assistant-tip');
   assert(true, 'assistant shows tips on difficulty "Mittel"');
+  const offer = page.locator('#assistant [data-action="assistantOffer"]').first();
+  if (await offer.count()) {
+    await offer.click();
+    await page.waitForSelector('#assistant .assistant-offer');
+    await shot('02c-assistant-offer');
+    await page.click('#assistant [data-action="assistantAccept"]');
+    await page.waitForSelector('#assistant .assistant-done');
+    assert(true, 'assistant asks "Darf ich helfen?" and carries out the changes after consent');
+  }
   await shot('02b-assistant');
   await page.click('.menu-btn');
   await page.click('[data-action="menuTab"][data-tab="settings"]');
@@ -116,8 +125,9 @@ try {
   assert(await page.evaluate(() => document.getElementById('assistant').hidden), 'assistant can be switched off');
   await page.locator('.modal input[data-key="assistant"]').check();
   await page.selectOption('.modal select[data-key="difficulty"]', 'normal');
-  await page.click('.modal [data-modal-close]');
-  await page.waitForSelector('.modal', { state: 'detached' });
+  await page.click('.menu-modal [data-modal-close]');
+  await page.waitForSelector('.menu-modal', { state: 'detached' });
+  while (await page.locator('.event-option').count()) await page.locator('.event-option:not([disabled])').first().click();
 
   console.log('Panels');
   await page.waitForSelector('#drawer[data-panel="overview"]:not([hidden])');

@@ -13,8 +13,12 @@ import { warsOf, sideOf } from './war/wars.js';
 import { warOutlook } from './war/outlook.js';
 import { formatPct, formatBn } from '../util/format.js';
 import { formatDateDE } from '../core/calendar.js';
+import {
+  balanceBudgetFix, approvalFix, electionFix, repayFix, researchFix, tradeFix, militaryFundingFix,
+  defenseFix, losingWarFix, winningWarFix, growthFix,
+} from './assistantFixes.js';
 
-const tip = (priority, tone, title, text, action = null) => ({ priority, tone, title, text, action });
+const tip = (priority, tone, title, text, action = null, fix = null) => ({ priority, tone, title, text, action, fix });
 const open = (panel, label) => ({ type: 'openPanel', panel, label });
 
 /** Most negative factor of a breakdown (ignoring the base value). */
@@ -55,36 +59,37 @@ export function assistantTips(state, c, { detail = false } = {}) {
 
   // --- people and politics
   if (p.approval < 45) {
-    const adv = approvalAdvice(c, worstFactor(approvalFactors(c)));
-    tips.push(tip(p.approval < 30 ? 95 : 70, p.approval < 30 ? 'bad' : 'warn', `Die Bevölkerung ist unzufrieden (Zustimmung ${Math.round(p.approval)})`, adv.text, adv.action));
+    const worst = worstFactor(approvalFactors(c));
+    const adv = approvalAdvice(c, worst);
+    tips.push(tip(p.approval < 30 ? 95 : 70, p.approval < 30 ? 'bad' : 'warn', `Die Bevölkerung ist unzufrieden (Zustimmung ${Math.round(p.approval)})`, adv.text, adv.action, approvalFix(state, c, worst?.label)));
   }
   if (p.stability < 40) {
     const worst = worstFactor(stabilityFactors(c));
-    tips.push(tip(p.stability < 25 ? 90 : 65, 'bad', `Das Land ist instabil (Stabilität ${Math.round(p.stability)})`, `Größter Einfluss: ${worst?.label ?? 'Zustimmung'}. Bei sehr niedriger Stabilität drohen Putschversuche. Steigern Sie zuerst die Zustimmung.`, open('politics', 'Politik')));
+    tips.push(tip(p.stability < 25 ? 90 : 65, 'bad', `Das Land ist instabil (Stabilität ${Math.round(p.stability)})`, `Größter Einfluss: ${worst?.label ?? 'Zustimmung'}. Bei sehr niedriger Stabilität drohen Putschversuche. Steigern Sie zuerst die Zustimmung.`, open('politics', 'Politik'), approvalFix(state, c, worstFactor(approvalFactors(c))?.label)));
   }
   if (p.nextElection && p.nextElection - state.time.day < 240 && p.approval < 50) {
-    tips.push(tip(75, 'warn', `Wahl am ${formatDateDE(p.nextElection)}`, `Mit ${Math.round(p.approval)} % Zustimmung könnte Ihre Regierung abgewählt werden. Jetzt ist ein guter Moment für Entlastungen (Steuern, Soziales).`, open('politics', 'Politik')));
+    tips.push(tip(75, 'warn', `Wahl am ${formatDateDE(p.nextElection)}`, `Mit ${Math.round(p.approval)} % Zustimmung könnte Ihre Regierung abgewählt werden. Jetzt ist ein guter Moment für Entlastungen (Steuern, Soziales).`, open('politics', 'Politik'), electionFix(c)));
   }
 
   // --- money
   const deficit = (-e.lastBalance * 12) / e.gdp;
   if (e.treasury < e.gdp * 0.005 && e.lastBalance < 0) {
-    tips.push(tip(85, 'bad', 'Die Staatskasse ist fast leer', `Noch ${formatBn(e.treasury)} bei einem Defizit von ${formatBn(-e.lastBalance)} pro Monat. Fehlbeträge werden über neue Schulden gedeckt – erhöhen Sie Steuern leicht oder kürzen Sie Ausgaben.`, open('economy', 'Haushalt')));
+    tips.push(tip(85, 'bad', 'Die Staatskasse ist fast leer', `Noch ${formatBn(e.treasury)} bei einem Defizit von ${formatBn(-e.lastBalance)} pro Monat. Fehlbeträge werden über neue Schulden gedeckt – erhöhen Sie Steuern leicht oder kürzen Sie Ausgaben.`, open('economy', 'Haushalt'), balanceBudgetFix(c, { atWar: !!c.military?.atWar })));
   } else if (deficit > 0.04) {
-    tips.push(tip(60, 'warn', `Hohes Haushaltsdefizit (${formatPct(deficit)} des BIP)`, 'Die Schulden wachsen schnell. Kürzen Sie die größten Ausgabenposten etwas oder erhöhen Sie die Steuern um 1 Prozentpunkt.', open('economy', 'Haushalt')));
+    tips.push(tip(60, 'warn', `Hohes Haushaltsdefizit (${formatPct(deficit)} des BIP)`, 'Die Schulden wachsen schnell. Kürzen Sie die größten Ausgabenposten etwas oder erhöhen Sie die Steuern um 1 Prozentpunkt.', open('economy', 'Haushalt'), balanceBudgetFix(c, { atWar: !!c.military?.atWar })));
   }
   if (debtRatio(c) > e.debtTolerance) {
-    tips.push(tip(70, 'bad', `Schulden zu hoch (${formatPct(debtRatio(c), 0)} des BIP)`, `Die Märkte verlangen höhere Zinsen ab ${formatPct(e.debtTolerance, 0)}. Ohne Gegensteuern droht ein Staatsbankrott.`, open('economy', 'Haushalt')));
+    tips.push(tip(70, 'bad', `Schulden zu hoch (${formatPct(debtRatio(c), 0)} des BIP)`, `Die Märkte verlangen höhere Zinsen ab ${formatPct(e.debtTolerance, 0)}. Ohne Gegensteuern droht ein Staatsbankrott.`, open('economy', 'Haushalt'), balanceBudgetFix(c, { atWar: !!c.military?.atWar })));
   } else if (e.treasury > e.gdp * 0.06 && e.debt > e.gdp * 0.2) {
-    tips.push(tip(25, 'info', 'Viel Geld in der Kasse', `Mit ${formatBn(e.treasury)} können Sie Schulden tilgen und so Zinsen sparen – oder gezielt investieren.`, open('economy', 'Tilgen')));
+    tips.push(tip(25, 'info', 'Viel Geld in der Kasse', `Mit ${formatBn(e.treasury)} können Sie Schulden tilgen und so Zinsen sparen – oder gezielt investieren.`, open('economy', 'Tilgen'), repayFix(c)));
   }
 
   // --- economy
   if (e.growth < 0) {
-    tips.push(tip(60, 'warn', `Rezession (${formatPct(e.growth)} Wachstum)`, 'Mehr Infrastruktur- und Forschungsausgaben, Handelsabkommen und das Beseitigen von Rohstoffmangel bringen die Wirtschaft wieder in Schwung.', open('economy', 'Wirtschaft')));
+    tips.push(tip(60, 'warn', `Rezession (${formatPct(e.growth)} Wachstum)`, 'Mehr Infrastruktur- und Forschungsausgaben, Handelsabkommen und das Beseitigen von Rohstoffmangel bringen die Wirtschaft wieder in Schwung.', open('economy', 'Wirtschaft'), growthFix(c)));
   }
   if (e.inflation > 0.07) {
-    tips.push(tip(55, 'warn', `Hohe Inflation (${formatPct(e.inflation)})`, 'Ein kleineres Defizit senkt die Inflation. Rohstoffpreise (Öl, Nahrung) treiben sie zusätzlich.', open('economy', 'Wirtschaft')));
+    tips.push(tip(55, 'warn', `Hohe Inflation (${formatPct(e.inflation)})`, 'Ein kleineres Defizit senkt die Inflation. Rohstoffpreise (Öl, Nahrung) treiben sie zusätzlich.', open('economy', 'Wirtschaft'), balanceBudgetFix(c, { atWar: !!c.military?.atWar })));
   }
   // shortages: which resource and who could deliver
   let worstShortage = null;
@@ -97,18 +102,18 @@ export function assistantTips(state, c, { detail = false } = {}) {
       .map((id) => state.countries[id])
       .filter((x) => x.id !== c.id && !x.eliminated && x.resources[worstShortage.rid].production > x.resources[worstShortage.rid].consumption && !hasTreaty(state, c.id, x.id, 'trade') && getOpinion(state, c.id, x.id) > -20)
       .sort((a, b) => b.resources[worstShortage.rid].production - a.resources[worstShortage.rid].production)[0];
-    tips.push(tip(50, 'warn', `Mangel an ${RESOURCES[worstShortage.rid].name} (${formatPct(worstShortage.share, 0)} fehlen)`, producer ? `Ein Handelsabkommen mit ${producer.name} (großer Exporteur) würde helfen. Klicken Sie das Land auf der Karte an.` : 'Handelsabkommen mit Förderländern würden helfen.', open('trade', 'Handel')));
+    tips.push(tip(50, 'warn', `Mangel an ${RESOURCES[worstShortage.rid].name} (${formatPct(worstShortage.share, 0)} fehlen)`, producer ? `Ein Handelsabkommen mit ${producer.name} (großer Exporteur) würde helfen. Klicken Sie das Land auf der Karte an.` : 'Handelsabkommen mit Förderländern würden helfen.', open('trade', 'Handel'), producer ? tradeFix(state, c, producer.id) : null));
   }
 
   // --- research
-  if (!c.technology.current) tips.push(tip(55, 'warn', 'Keine Forschung aktiv', 'Forschungspunkte verfallen ungenutzt. Wählen Sie eine Technologie – Wirtschaftstechnologien bringen dauerhaft mehr Wachstum.', open('research', 'Forschung wählen')));
+  if (!c.technology.current) tips.push(tip(55, 'warn', 'Keine Forschung aktiv', 'Forschungspunkte verfallen ungenutzt. Wählen Sie eine Technologie – Wirtschaftstechnologien bringen dauerhaft mehr Wachstum.', open('research', 'Forschung wählen'), researchFix(state, c)));
 
   // --- security
   const wars = warsOf(state, c.id);
   for (const w of wars) {
     const o = warOutlook(state, w, sideOf(w, c.id));
-    if (o.tone === 'bad') tips.push(tip(92, 'bad', `${w.name}: ${o.verdict}`, `${o.reasons[0] ?? ''} Bestellen Sie Verstärkung (Militär → Aufrüsten), stellen Sie den Generalstab auf „Verteidigen“ oder bieten Sie einen weißen Frieden an.`, open('wars', 'Kriegsübersicht')));
-    else if (o.tone === 'good' && Math.abs(o.score) > 40) tips.push(tip(45, 'good', `${w.name}: ${o.verdict}`, 'Ein guter Zeitpunkt für einen Friedensvertrag mit Forderungen (besetzte Gebiete, Reparationen) – bevor die Kriegsmüdigkeit steigt.', open('wars', 'Frieden verhandeln')));
+    if (o.tone === 'bad') tips.push(tip(92, 'bad', `${w.name}: ${o.verdict}`, `${o.reasons[0] ?? ''} Bestellen Sie Verstärkung (Militär → Aufrüsten), stellen Sie den Generalstab auf „Verteidigen“ oder bieten Sie einen weißen Frieden an.`, open('wars', 'Kriegsübersicht'), losingWarFix(state, c, w)));
+    else if (o.tone === 'good' && Math.abs(o.score) > 40) tips.push(tip(45, 'good', `${w.name}: ${o.verdict}`, 'Ein guter Zeitpunkt für einen Friedensvertrag mit Forderungen (besetzte Gebiete, Reparationen) – bevor die Kriegsmüdigkeit steigt.', open('wars', 'Frieden verhandeln'), winningWarFix(state, c, w)));
   }
   if (!wars.length) {
     const allies = new Set(alliesOf(state, c.id));
@@ -117,14 +122,14 @@ export function assistantTips(state, c, { detail = false } = {}) {
       .filter((n) => !allies.has(n.id) && getOpinion(state, c.id, n.id) < -30 && n.military.power > c.military.power * 1.5);
     const planning = state.countryOrder.find((id) => state.countries[id].ai?.warPlan?.target === c.id);
     if (planning) {
-      tips.push(tip(88, 'bad', `${state.countries[planning].name} bereitet möglicherweise einen Angriff vor`, 'Rüsten Sie auf (Militär → Aufrüsten), suchen Sie Verbündete oder verbessern Sie die Beziehungen.', open('military', 'Aufrüsten')));
+      tips.push(tip(88, 'bad', `${state.countries[planning].name} bereitet möglicherweise einen Angriff vor`, 'Rüsten Sie auf (Militär → Aufrüsten), suchen Sie Verbündete oder verbessern Sie die Beziehungen.', open('military', 'Aufrüsten'), defenseFix(c)));
     } else if (threats.length) {
       const t = threats.sort((a, b) => b.military.power - a.military.power)[0];
       tips.push(tip(40, 'warn', `Starker, feindseliger Nachbar: ${t.name}`, `${t.name} ist ${(t.military.power / Math.max(1, c.military.power)).toFixed(1).replace('.', ',')}-mal so stark wie Sie. Ein Bündnis oder bessere Beziehungen schützen am günstigsten.`, open('diplomacy', 'Diplomatie')));
     }
   }
   if ((c.military.spending?.funding ?? 1) < 0.95) {
-    tips.push(tip(50, 'warn', 'Militärbudget reicht nicht für den Unterhalt', 'Die Einsatzbereitschaft sinkt. Erhöhen Sie das Verteidigungsbudget leicht oder lösen Sie Verbände auf.', open('military', 'Militär')));
+    tips.push(tip(50, 'warn', 'Militärbudget reicht nicht für den Unterhalt', 'Die Einsatzbereitschaft sinkt. Erhöhen Sie das Verteidigungsbudget leicht oder lösen Sie Verbände auf.', open('military', 'Militär'), militaryFundingFix(c)));
   }
 
   // --- good news / next steps
