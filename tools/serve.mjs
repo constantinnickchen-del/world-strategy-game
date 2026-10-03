@@ -40,4 +40,17 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(PORT, () => console.log(`World Strategy läuft auf http://localhost:${PORT}`));
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`Port ${PORT} ist bereits belegt (läuft das Spiel schon in einem anderen Fenster?).`);
+    console.error(`Anderen Port verwenden:  npm start -- 8302   und dann http://localhost:8302 öffnen.`);
+  } else {
+    console.error(`Server konnte nicht starten: ${err.message}`);
+  }
+  process.exit(1);
+});
+
+server.listen(PORT, () => {
+  console.log(`World Strategy läuft auf http://localhost:${PORT}  (alternativ http://127.0.0.1:${PORT})`);
+  console.log('Dieses Fenster offen lassen, solange Sie spielen. Beenden mit Strg + C.');
+});
