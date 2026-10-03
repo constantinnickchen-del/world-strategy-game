@@ -37,6 +37,11 @@ export class NewsTicker {
   render(force = false) {
     const state = this.ui.session.state;
     if (!state) return;
+    this.el.hidden = !this.ui.settings.showNewsTicker;
+    if (this.el.hidden) {
+      this.lastId = null;
+      return;
+    }
     const items = filterNews(state, this.ui.settings.newsFilter).slice(-3).reverse();
     const key = `${items[0]?.id}|${this.ui.settings.newsFilter}`;
     if (!force && key === this.lastId) return;

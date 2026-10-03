@@ -9,6 +9,8 @@ export const DEFAULT_SETTINGS = {
   pauseOnEvents: true,
   newsFilter: 'relevant', // 'relevant' | 'all' | 'own'
   showLabels: true,
+  showNewsTicker: false, // news strip at the bottom of the map
+  newsToasts: false, // pop-up messages for important news
   tutorialDone: false,
   // situations that stop the clock immediately (unchecked: advisors decide automatically)
   pauseOn: {

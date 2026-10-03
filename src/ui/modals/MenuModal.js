@@ -103,6 +103,9 @@ export class MenuModal {
         </label>
         <label class="check"><input type="checkbox" data-action-change="setSetting" data-key="pauseOnEvents"${s.pauseOnEvents ? ' checked' : ''}> Bei Ereignissen pausieren</label>
         <label class="check"><input type="checkbox" data-action-change="setSetting" data-key="showLabels"${s.showLabels ? ' checked' : ''}> Ländernamen auf der Karte anzeigen</label>
+        <label class="check"><input type="checkbox" data-action-change="setSetting" data-key="showNewsTicker"${s.showNewsTicker ? ' checked' : ''}> Nachrichtenleiste unten auf der Karte anzeigen</label>
+        <label class="check"><input type="checkbox" data-action-change="setSetting" data-key="newsToasts"${s.newsToasts ? ' checked' : ''}> Wichtige Nachrichten als Einblendung oben anzeigen</label>
+        <p class="muted small">Alle Meldungen finden Sie jederzeit im Bereich „Nachrichten“ (Taste O).</p>
         <h4 class="kbd-title">Automatisch pausieren bei …</h4>
         <p class="muted small">Die Simulation stoppt sofort am Tag des Ereignisses – auch bei maximaler Geschwindigkeit. Ist ein Punkt abgewählt, entscheidet Ihr Beraterstab die zugehörige Krise selbst.</p>
         <div class="pause-settings">${PAUSE_REASONS.map((r) => `<label class="check" data-tip="${esc(r.hint)}"><input type="checkbox" data-action-change="setPauseSetting" data-key="${r.id}"${(s.pauseOn ?? {})[r.id] !== false ? ' checked' : ''}> ${r.label}</label>`).join('')}</div>

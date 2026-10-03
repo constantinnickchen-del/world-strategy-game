@@ -360,7 +360,8 @@ export class UIManager {
       revolution: 'Machtwechsel',
     };
     const who = info.countryId ? ` (${state.countries[info.countryId]?.name ?? ''})` : '';
-    this.toasts.show(`⏸ Spiel angehalten: ${labels[info.kind] ?? info.kind}${who}.`, { tone: 'warn', ms: 6000 });
+    // a crisis window explains the pause by itself; otherwise one short note
+    if (!this.session.hasPendingPlayerEvent && info.kind !== 'playerDeclared') this.toasts.show(`⏸ Spiel angehalten: ${labels[info.kind] ?? info.kind}${who}.`, { tone: 'warn', ms: 4000 });
     const war = info.warId ? state.wars.find((w) => w.id === info.warId) : null;
     if (war && info.kind !== 'peace') {
       this.openWarsPanel(war.id);
@@ -388,7 +389,7 @@ export class UIManager {
   execute(cmd) {
     const res = this.session.execute(cmd);
     if (!res.ok) this.toasts.show(res.error, { tone: 'bad' });
-    else if (res.message) this.toasts.show(res.message, { tone: res.accepted === false ? 'warn' : 'good' });
+    else if (res.message) this.toasts.show(res.message, { tone: res.accepted === false ? 'warn' : 'good', ms: 2500 });
     this.markAll();
     if (cmd.type === 'resolveEvent') this.eventModal.sync();
     return res;
@@ -487,7 +488,7 @@ export class UIManager {
       this.map.showLabels = value;
       this.mark('map', 'controls');
     }
-    if (key === 'newsFilter') this.mark('news', 'drawer');
+    if (key === 'newsFilter' || key === 'showNewsTicker') this.mark('news', 'drawer');
   }
 
   /** Handlers for data-action="..." */
@@ -740,6 +741,10 @@ export class UIManager {
   announceNews() {
     const state = this.session.state;
     if (this.mode !== 'game' || !state.news.length) return;
+    if (!this.settings.newsToasts) {
+      this.lastNewsId = state.news.at(-1).id;
+      return;
+    }
     for (const n of state.news) {
       if (n.id <= (this.lastNewsId ?? 0)) continue;
       if (n.importance >= 3 && n.category !== 'event') this.toasts.show(n.text, { tone: 'info', ms: 6000 });

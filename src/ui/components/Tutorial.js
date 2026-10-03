@@ -116,9 +116,9 @@ export const TUTORIAL_STEPS = [
     prepare: (ui) => ui.setTutorialLayout({ panel: 'wars', select: null }),
   },
   {
-    target: '#newsfeed',
+    target: '#sidebar [data-panel="news"]',
     title: 'Nachrichten',
-    text: 'Hier erscheinen Meldungen aus Ihrem Land und der Welt. Manchmal müssen Sie auch Entscheidungen treffen – dann hält das Spiel an und ein Fenster erscheint.',
+    text: 'Alle Meldungen aus Ihrem Land und der Welt lesen Sie hier (Taste <span class="kbd">O</span>) – ohne dass ständig etwas eingeblendet wird. Wenn Sie etwas entscheiden müssen, hält das Spiel an und ein Fenster erscheint. Einblendungen lassen sich im Menü ☰ unter „Einstellungen“ wieder einschalten.',
     prepare: (ui) => ui.setTutorialLayout({ panel: 'overview', select: null }),
   },
   {
