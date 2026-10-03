@@ -281,14 +281,23 @@ try {
     session.settings.pauseOnEvents = false; // only crises may stop the clock in this check
     session.setSpeed(4);
     const t0 = performance.now();
-    while (session.clock.speed !== 0 && performance.now() - t0 < 15000) await new Promise((r) => setTimeout(r, 30));
+    // other (real) crises may stop the clock earlier: decide them and continue
+    while (performance.now() - t0 < 20000) {
+      if (session.clock.speed === 0) {
+        if (declaredDay !== null) break;
+        for (const e of [...session.state.events.pending]) window.worldStrategy.ui.execute({ type: 'resolveEvent', uid: e.uid, option: e.eventId === 'warPeaceOffer' ? 1 : 0 });
+        session.setSpeed(4);
+      }
+      await new Promise((r) => setTimeout(r, 30));
+    }
     session.settings.pauseOnEvents = true;
     return { declaredDay, day: session.state.time.day, speed: session.clock.speed, kind: session.lastInterrupt?.kind };
   });
   assert(pause.speed === 0 && pause.declaredDay === pause.day && pause.kind === 'warDeclared', `AI war at maximum speed pauses on the same day (${JSON.stringify(pause)})`);
-  await page.waitForSelector('.event-modal.is-crisis');
+  // ordinary events that arrived meanwhile may be shown first – the crisis must be among the decisions
+  assert(await page.evaluate(() => window.worldStrategy.session.state.events.pending.some((e) => e.eventId === 'warCrisis')), 'crisis decision for the player is pending');
+  await page.waitForSelector('.event-modal');
   await shot('11-crisis');
-  await page.locator('.event-modal .event-option:not([disabled])').first().click();
   while (await page.locator('.event-option').count()) await page.locator('.event-option:not([disabled])').first().click();
 
   console.log('Reload persistence');
