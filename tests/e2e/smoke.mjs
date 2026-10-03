@@ -255,11 +255,14 @@ try {
   });
   assert(moved.target === 'DE-BE' && moved.mode === null, 'move order via map click');
   // declaring war through the dialog stops the clock immediately
-  await page.evaluate(() => window.worldStrategy.session.setSpeed(2));
   await page.evaluate(() => window.worldStrategy.ui.declareWar.open('VEN'));
   await page.waitForSelector('.war-modal [data-declare]');
   await shot('09-declare-war');
-  await page.click('.war-modal [data-declare]');
+  // start the clock and declare in the same tick (no random event can get in between)
+  await page.evaluate(() => {
+    window.worldStrategy.session.setSpeed(2);
+    document.querySelector('.war-modal [data-declare]').click();
+  });
   await page.waitForSelector('#drawer[data-panel="wars"]:not([hidden])');
   const declared = await page.evaluate(() => ({ speed: window.worldStrategy.session.clock.speed, kind: window.worldStrategy.session.lastInterrupt?.kind, wars: window.worldStrategy.session.state.wars.length }));
   assert(declared.speed === 0 && declared.kind === 'playerDeclared' && declared.wars >= 1, 'player war declaration pauses and opens the war room');
