@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>World Strategy</title>
+    <meta name="description" content="Grand-Strategy-Spiel im Browser: Führen Sie ein reales Land durch Jahrzehnte voller Wirtschaft, Diplomatie und Krisen.">
+    <meta name="theme-color" content="#0b141d">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%230d1a27' stroke='%23c8a25a' stroke-width='2'/%3E%3Cpath d='M16 4l3 12-3 12-3-12z' fill='%23c8a25a'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/components.css">
+  </head>
+  <body class="is-setup">
+    <div id="app">
+      <header id="topbar"></header>
+      <nav id="sidebar" aria-label="Hauptnavigation"></nav>
+      <section id="drawer" aria-label="Panel" hidden></section>
+      <main id="map-wrap">
+        <canvas id="map" aria-label="Weltkarte – Länder anklicken, Mausrad zum Zoomen, Ziehen zum Verschieben"></canvas>
+        <div id="map-controls"></div>
+        <footer id="newsfeed" aria-live="polite"></footer>
+        <div id="start-screen" hidden></div>
+      </main>
+      <aside id="infopanel" aria-label="Länderinformationen" hidden></aside>
+    </div>
+    <div id="tooltip" role="tooltip" hidden></div>
+    <div id="modal-root"></div>
+    <div id="toasts" aria-live="polite"></div>
+    <div id="boot" class="boot"><p>World Strategy wird geladen …</p></div>
+    <noscript><p class="boot">World Strategy benötigt JavaScript.</p></noscript>
+    <script type="module" src="src/main.js"></script>
+  </body>
+</html>

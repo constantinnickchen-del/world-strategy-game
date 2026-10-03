@@ -1,7 +1,7 @@
 {
   "name": "world-strategy",
   "version": "0.1.0",
-  "description": "Langfristiges Grand-Strategy-Spiel für den Browser (HTML, CSS, JavaScript).",
+  "description": "Langfristiges Grand-Strategy-Spiel f\u00fcr den Browser (HTML, CSS, JavaScript).",
   "type": "module",
   "private": true,
   "scripts": {
@@ -9,7 +9,8 @@
     "test": "node --test \"tests/**/*.test.js\"",
     "test:e2e": "node tests/e2e/smoke.mjs",
     "simulate": "node tools/simulate.mjs",
-    "build:world": "node tools/build-world.mjs"
+    "build:world": "node tools/build-world.mjs",
+    "lint": "eslint ."
   },
   "engines": {
     "node": ">=20"

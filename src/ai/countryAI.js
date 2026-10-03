@@ -18,6 +18,9 @@ import { clamp } from '../util/math.js';
 
 const STEP = 0.005;
 const PROPOSAL_COOLDOWN_DAYS = 365;
+// Proposals to the human player are rarer and wait longer, so decisions stay meaningful.
+const PLAYER_PROPOSAL_COOLDOWN_DAYS = 730;
+const PLAYER_PROPOSAL_CHANCE = 0.35;
 
 function cmd(state, ctx, c, type, payload) {
   return executeCommand(state, { type, countryId: c.id, ...payload }, ctx);
@@ -88,7 +91,8 @@ export function researchAdvisor(state, c, ctx) {
 
 function recentlyProposed(state, a, b) {
   const last = getRelation(state, a, b)?.lastProposal?.[a];
-  return last !== undefined && state.time.day - last < PROPOSAL_COOLDOWN_DAYS;
+  const cooldown = b === state.playerId ? PLAYER_PROPOSAL_COOLDOWN_DAYS : PROPOSAL_COOLDOWN_DAYS;
+  return last !== undefined && state.time.day - last < cooldown;
 }
 
 export function diplomacyAdvisor(state, c, ctx) {
@@ -112,6 +116,7 @@ export function diplomacyAdvisor(state, c, ctx) {
     return;
   }
   if (tradeBlocked(state, c.id, other) || recentlyProposed(state, c.id, other)) return;
+  if (other === state.playerId && !ctx.rng.chance(PLAYER_PROPOSAL_CHANCE)) return;
   if (!hasTreaty(state, c.id, other, 'trade') && opinion > 10) {
     cmd(state, ctx, c, 'proposeTreaty', { targetId: other, treaty: 'trade' });
   } else if (!hasTreaty(state, c.id, other, 'nonAggression') && opinion > 0 && opinion < 50 && neighborCountryIds(state, c.id).includes(other) && ctx.rng.chance(0.3)) {

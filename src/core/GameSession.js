@@ -41,6 +41,7 @@ export class GameSession {
 
   replaceState(state) {
     this.state = state;
+    this.autoPausedSpeed = 0;
     this.clock.setSpeed(0);
     this.bus.emit('state:replaced', state);
   }
@@ -54,6 +55,7 @@ export class GameSession {
   }
 
   setSpeed(speed) {
+    if (speed > 0) this.autoPausedSpeed = 0;
     const s = this.clock.setSpeed(speed);
     this.bus.emit('speed', s);
     return s;
@@ -73,6 +75,7 @@ export class GameSession {
       this.sim.advanceDay(this.state);
       done++;
       if (this.hasPendingPlayerEvent && this.settings.pauseOnEvents !== false) {
+        this.autoPausedSpeed = this.clock.speed;
         this.setSpeed(0);
         break;
       }
@@ -89,7 +92,13 @@ export class GameSession {
   /** Execute a command for the player country (countryId defaults to the player). */
   execute(cmd) {
     const full = { countryId: this.state.playerId, ...cmd };
-    return executeCommand(this.state, full, this.sim.context(this.state));
+    const result = executeCommand(this.state, full, this.sim.context(this.state));
+    // The game paused itself for an event: resume once the last decision is made.
+    if (result.ok && cmd.type === 'resolveEvent' && !this.hasPendingPlayerEvent && this.autoPausedSpeed) {
+      this.setSpeed(this.autoPausedSpeed);
+      this.autoPausedSpeed = 0;
+    }
+    return result;
   }
 
   validate(cmd) {

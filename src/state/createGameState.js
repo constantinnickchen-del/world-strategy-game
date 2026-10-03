@@ -16,6 +16,7 @@ import { createRngState, Rng, hashString } from '../core/random.js';
 import { parseISODate, addYears } from '../core/calendar.js';
 import { ensureRelation, setTreaty, setEmbargo, targetOpinion } from '../systems/diplomacy.js';
 import { primeDerivedValues } from './prime.js';
+import { statisticsSystem } from '../systems/statistics.js';
 
 export const SCHEMA_VERSION = 1;
 
@@ -237,6 +238,7 @@ export function createGameState({ scenarioId = DEFAULT_SCENARIO, playerId = null
   calibrateBudgets(state);
   setupDiplomacy(state);
   primeDerivedValues(state);
+  statisticsSystem.monthly(state); // first history sample = scenario start
   return state;
 }
 
