@@ -1074,48 +1074,12 @@ input[type='range'] {
 }
 
 /* ---------- News ---------- */
-#newsfeed {
-  position: absolute;
-  left: 12px;
-  bottom: 12px;
-  width: min(560px, calc(100% - 290px));
-  z-index: 4;
-}
-
-.ticker {
-  display: flex;
-  align-items: stretch;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: rgba(13, 22, 30, 0.92);
-  backdrop-filter: blur(4px);
-  overflow: hidden;
-}
-
-.ticker-label {
-  padding: 0 10px;
-  border: 0;
-  border-right: 1px solid var(--line);
-  background: rgba(200, 162, 90, 0.12);
-  color: var(--brass);
-  font: 600 11px var(--font-cond);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-}
-
-.ticker-list,
 .news-list {
   list-style: none;
   margin: 0;
   padding: 0;
   flex: 1;
   min-width: 0;
-}
-
-.ticker-list > li.muted {
-  padding: 10px;
 }
 
 .news-btn {
@@ -1155,17 +1119,6 @@ input[type='range'] {
 
 .news-list .news-btn {
   padding: 8px 4px;
-}
-
-@media (max-width: 760px) {
-  #newsfeed {
-    width: calc(100% - 24px);
-    bottom: 96px;
-  }
-
-  .ticker-list li:nth-child(n + 2) {
-    display: none;
-  }
 }
 
 /* ---------- Map controls ---------- */
@@ -1308,6 +1261,16 @@ input[type='range'] {
 
 .map-zoom .icon-btn {
   background: rgba(13, 22, 30, 0.9);
+}
+
+.news-toggle {
+  position: relative;
+}
+
+.news-toggle .nav-badge {
+  top: 3px;
+  right: 3px;
+  box-shadow: 0 0 0 2px #0d161e;
 }
 
 @media (max-width: 760px) {

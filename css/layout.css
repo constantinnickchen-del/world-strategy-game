@@ -79,7 +79,6 @@ body.is-move-mode #map {
 /* setup mode (country selection) hides game chrome */
 body.is-setup #sidebar,
 body.is-setup #drawer,
-body.is-setup #newsfeed,
 body.is-setup #infopanel,
 body.is-setup .topbar-game {
   display: none !important;

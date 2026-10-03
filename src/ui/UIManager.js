@@ -12,7 +12,6 @@ import { MAP_MODE_BY_ID } from '../map/mapModes.js';
 import { TopBar } from './components/TopBar.js';
 import { Sidebar, NAV_ITEMS } from './components/Sidebar.js';
 import { InfoPanel } from './components/InfoPanel.js';
-import { NewsTicker } from './components/NewsFeed.js';
 import { MapControls } from './components/MapControls.js';
 import { Tooltip } from './components/Tooltip.js';
 import { ModalManager, Toasts } from './components/Modal.js';
@@ -91,7 +90,6 @@ export class UIManager {
     this.topBar = new TopBar($('topbar'), this);
     this.sidebar = new Sidebar($('sidebar'), this);
     this.infoPanel = new InfoPanel($('infopanel'), this);
-    this.ticker = new NewsTicker($('newsfeed'), this);
     this.mapControls = new MapControls($('map-controls'), this);
     this.eventModal = new EventModal(this);
     this.menu = new MenuModal(this);
@@ -222,13 +220,16 @@ export class UIManager {
     this.dirty = new Set();
     if (d.has('top')) this.topBar.update();
     if (d.has('nav')) this.sidebar.update();
+    if (d.has('nav') || d.has('news')) {
+      if (this.activePanel === 'news') this.unreadNews = false;
+      this.mapControls.update();
+    }
     if (d.has('controls')) this.mapControls.render();
     if (d.has('map')) this.map.requestRender();
     if (this.mode === 'setup') {
       if (d.has('start')) this.startScreen.render();
       return;
     }
-    if (d.has('news')) this.ticker.render(d.has('drawer'));
     if (d.has('events')) this.eventModal.sync();
     if (d.has('drawer')) {
       if (this.sliderActive) this.dirty.add('drawer');
@@ -348,19 +349,6 @@ export class UIManager {
   onInterrupted(info) {
     if (this.mode !== 'game') return;
     const state = this.session.state;
-    const labels = {
-      warDeclared: 'Kriegsausbruch',
-      playerDeclared: 'Kriegserklärung',
-      attackOnPlayer: 'Angriff auf Ihr Land',
-      warJoined: 'Neuer Kriegsgegner',
-      allianceCall: 'Bündnisfall',
-      diplomaticCrisis: 'Diplomatische Krise',
-      peace: 'Friedensschluss',
-      bankruptcy: 'Staatsbankrott',
-      revolution: 'Machtwechsel',
-    };
-    const who = info.countryId ? ` (${state.countries[info.countryId]?.name ?? ''})` : '';
-    this.toasts.show(`⏸ Spiel angehalten: ${labels[info.kind] ?? info.kind}${who}.`, { tone: 'warn', ms: 6000 });
     const war = info.warId ? state.wars.find((w) => w.id === info.warId) : null;
     if (war && info.kind !== 'peace') {
       this.openWarsPanel(war.id);
@@ -736,13 +724,14 @@ export class UIManager {
     this.tooltip.showAt(`<b>${esc(STATIC_REGIONS[regionId].name)}</b> · ${flagEmoji(c.iso2)} ${esc(c.name)}${ctrl}${siege}<br>${esc(mode.value(state, c, this))}`, ev.clientX, ev.clientY);
   }
 
-  /** Major news about the player's country (or the whole world) appear as a toast. */
-  announceNews() {
+  /** New news refresh an open news panel; major ones mark the news button as unread. */
+  trackNews() {
     const state = this.session.state;
     if (this.mode !== 'game' || !state.news.length) return;
     for (const n of state.news) {
       if (n.id <= (this.lastNewsId ?? 0)) continue;
-      if (n.importance >= 3 && n.category !== 'event') this.toasts.show(n.text, { tone: 'info', ms: 6000 });
+      if (this.activePanel === 'news') this.mark('drawer');
+      else if (n.importance >= 3 && n.category !== 'event') this.unreadNews = true;
     }
     this.lastNewsId = state.news.at(-1).id;
   }
@@ -762,7 +751,7 @@ export class UIManager {
           this.mark('drawer', 'info');
         }
       }
-      this.announceNews();
+      this.trackNews();
     });
     bus.on('month', () => {
       this.markAll();

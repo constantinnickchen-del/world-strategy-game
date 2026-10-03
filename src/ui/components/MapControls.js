@@ -40,6 +40,18 @@ export class MapControls {
         <button class="icon-btn" data-action="zoom" data-factor="0.667" aria-label="Herauszoomen" data-tip="Herauszoomen (Mausrad)">−</button>
         <button class="icon-btn" data-action="resetView" aria-label="Ganze Welt" data-tip="Ganze Welt anzeigen">◎</button>
         <button class="icon-btn${ui.settings.showLabels ? ' is-active' : ''}" data-action="toggleLabels" aria-label="Ländernamen ein/aus" aria-pressed="${ui.settings.showLabels}" data-tip="Ländernamen ein-/ausblenden">Aa</button>
+        ${hasPlayer ? `<button class="icon-btn news-toggle" data-action="togglePanel" data-panel="news" aria-label="Nachrichten" data-tip="<b>Nachrichten</b> <span class='kbd'>O</span>"><span aria-hidden="true">📰</span><span class="nav-badge" data-news-badge hidden></span></button>` : ''}
       </div>`;
+    this.update();
+  }
+
+  /** Active state of the news button and the dot for unread major news. */
+  update() {
+    const btn = this.el.querySelector('.news-toggle');
+    if (!btn) return;
+    const on = this.ui.activePanel === 'news';
+    btn.classList.toggle('is-active', on);
+    btn.setAttribute('aria-pressed', String(on));
+    btn.querySelector('[data-news-badge]').hidden = on || !this.ui.unreadNews;
   }
 }

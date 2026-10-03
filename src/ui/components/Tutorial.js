@@ -116,10 +116,10 @@ export const TUTORIAL_STEPS = [
     prepare: (ui) => ui.setTutorialLayout({ panel: 'wars', select: null }),
   },
   {
-    target: '#newsfeed',
+    target: '#map-controls .news-toggle',
     title: 'Nachrichten',
-    text: 'Hier erscheinen Meldungen aus Ihrem Land und der Welt. Manchmal müssen Sie auch Entscheidungen treffen – dann hält das Spiel an und ein Fenster erscheint.',
-    prepare: (ui) => ui.setTutorialLayout({ panel: 'overview', select: null }),
+    text: 'Über 📰 öffnen Sie die Meldungen aus Ihrem Land und der Welt – ein Punkt zeigt wichtige neue Nachrichten an. Manchmal müssen Sie auch Entscheidungen treffen – dann hält das Spiel an und ein Fenster erscheint.',
+    prepare: (ui) => ui.setTutorialLayout({ panel: 'news', select: null }),
   },
   {
     title: 'Los geht’s!',
