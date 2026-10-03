@@ -492,26 +492,37 @@ async function main() {
 
   // 6. dissolve regions (edge cancellation) ------------------------------------------------
   const edgeKey = (a, b) => `${a[0]},${a[1]}>${b[0]},${b[1]}`;
+  let openWalks = 0;
   const regionRings = regionsOut.map((reg) => {
-    const edges = new Map();
+    // Edges are counted with multiplicity: overlapping source polygons (e.g. an
+    // enclave province drawn on top of its neighbour) contribute the same edge
+    // twice, and losing one of them would leave an open chain that the renderer
+    // closes with a straight line across the region.
+    const edges = new Map(); // key -> { a, b, n }
     for (const pi of reg.provinces) {
       for (const r of provinces[pi].rings) {
         for (let i = 0; i < r.length; i++) {
           const a = r[i];
           const b = r[(i + 1) % r.length];
           if (a[0] === b[0] && a[1] === b[1]) continue;
-          const rev = edgeKey(b, a);
-          if (edges.has(rev)) edges.delete(rev);
-          else edges.set(edgeKey(a, b), [a, b]);
+          const rev = edges.get(edgeKey(b, a));
+          if (rev && rev.n > 0) {
+            rev.n--;
+            continue;
+          }
+          const k = edgeKey(a, b);
+          const e = edges.get(k);
+          if (e) e.n++;
+          else edges.set(k, { a, b, n: 1 });
         }
       }
     }
     // chain remaining edges into rings
     const out = new Map();
-    for (const [, [a, b]] of edges) {
+    for (const { a, b, n } of edges.values()) {
       const k = `${a[0]},${a[1]}`;
       if (!out.has(k)) out.set(k, []);
-      out.get(k).push(b);
+      for (let i = 0; i < n; i++) out.get(k).push(b);
     }
     const rings = [];
     for (const [startKey, list] of out) {
@@ -519,19 +530,28 @@ async function main() {
         const ring = [startKey.split(',').map(Number)];
         let cur = list.pop();
         let guard = 0;
+        let closed = false;
         while (guard++ < 2e6) {
           const k = `${cur[0]},${cur[1]}`;
-          if (k === startKey) break;
+          if (k === startKey) {
+            closed = true;
+            break;
+          }
           ring.push(cur);
           const nexts = out.get(k);
           if (!nexts || !nexts.length) break;
           cur = nexts.pop();
+        }
+        if (!closed) {
+          openWalks++;
+          continue; // an open chain is a data defect – never draw it as a ring
         }
         if (ring.length >= 3) rings.push(ring);
       }
     }
     return rings;
   });
+  console.log('open boundary walks dropped:', openWalks);
 
   // 7. topology: arcs -------------------------------------------------------------------------
   const edgeRegion = new Map();

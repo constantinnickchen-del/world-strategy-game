@@ -23,6 +23,9 @@ test('hit testing finds the right countries', () => {
     [[78, 22], 'IND'],
     [[134, -25], 'AUS'],
     [[-42, 72], 'DNK'], // Greenland (region owned by Denmark)
+    [[22.94, 40.64], 'GRC'], // Thessaloniki (region outline was once broken by overlapping provinces)
+    [[25.4, 41.1], 'GRC'], // Thrace
+    [[14.3, 48.3], 'AUT'], // Linz
     [[-30, 30], null], // Atlantic
   ];
   for (const [[lon, lat], expected] of cases) {
